@@ -1,0 +1,2043 @@
+\documentclass[a4paper, 12pt]{article}
+\usepackage{amsmath, amssymb} % math
+\usepackage{array} % math
+\usepackage{doi} % automatic doi-links
+\usepackage[round]{natbib} % bibliography
+\usepackage{multirow} % multicolumn and multirow
+\usepackage{booktabs} % nicer tables
+\usepackage[title]{appendix} % better appendices
+\usepackage{nameref} % reference appendices with names
+\usepackage[dvipsnames,table]{xcolor}
+%% \usepackage[onehalfspacing]{setspace} % more space
+\usepackage[doublespacing]{setspace} % more space
+\usepackage{helvet}
+\usepackage{mathpazo}
+\usepackage{sectsty} % use different fonts for different sections
+\allsectionsfont{\sffamily} % for sections use sans serif
+\usepackage[labelfont={bf,sf},font=small]{caption} % customize captions
+\usepackage{orcidlink} % for ORCID symbol with link
+\definecolor{lightgray}{gray}{0.95} % color for tables
+\usepackage{pdflscape} % rotated landscape
+\usepackage{afterpage} % floating landscape
+
+%% margins
+\usepackage{geometry}
+\geometry{
+  left=25mm,
+  right=25mm,
+  top=30mm,
+  bottom=30mm,
+}
+
+%% title, authors, affiliations, mail
+\title{\vspace{-4em} \textbf{\textsf{
+      Bayes Factor Group Sequential Designs
+}}}
+\author{
+  Samuel Pawel \orcidlink{0000-0003-2779-320X}
+  \and
+  Leonhard Held \orcidlink{0000-0002-8686-5325}
+}
+\date{
+  Epidemiology, Biostatistics and Prevention Institute (EBPI) \\
+  Center for Reproducible Science and Research Synthesis (CRS) \\
+  University of Zurich \\
+  \texttt{\{samuel.pawel,leonhard.held\}@uzh.ch} \\ ~ \\
+  \today
+}
+
+%% hyperref options
+\usepackage{hyperref}  
+\hypersetup{
+  bookmarksopen=true, 
+  breaklinks=true,
+  pdfsubject={},
+  pdfkeywords={},
+  colorlinks=true,
+  linkcolor=black,
+  anchorcolor=black,
+  citecolor=blue,
+  urlcolor=blue,
+}
+
+<< "main-setup", include = FALSE >>=
+## knitr options
+library(knitr)
+opts_chunk$set(fig.height = 4,
+               echo = FALSE,
+               warning = FALSE,
+               message = FALSE,
+               cache = FALSE,
+               eval = TRUE,
+               fig.align = "center")
+
+## printed digits
+options(scipen = 100000)
+
+## should sessionInfo be printed at the end?
+Reproducibility <- TRUE
+
+## packages
+## remotes::install_github(repo = "SamCH93/bfpwr", subdir = "package", ref = "gsd")
+library(bfpwr)
+library(xtable)
+library(mvtnorm)
+library(ggplot2)
+library(ggpubr)
+library(rpact)
+library(scales)
+library(dplyr)
+library(tidyr)
+library(ggrain)
+
+## colors
+col1 <- "#D55E00"
+col2 <- "#0072B2"
+col3 <- "#009E73"
+@
+
+\begin{document}
+
+
+\begin{onehalfspacing}
+\maketitle
+\end{onehalfspacing}
+
+%% should be less than 250 words
+\begin{abstract}
+  \noindent The Bayes factor, the data-based updating factor from prior to
+  posterior odds, is a principled measure of relative evidence for two competing
+  hypotheses. It is naturally suited to sequential data analysis in settings
+  such as clinical trials and animal experiments, where early stopping for
+  efficacy or futility is desirable. However, designing such studies is
+  challenging because computing design characteristics, such as the probability
+  of obtaining conclusive evidence or the expected sample size, typically
+  requires computationally intensive Monte Carlo simulations, as no closed-form
+  or efficient numerical methods exist. To address this issue, we extend results
+  from classical group sequential design theory to sequential Bayes factor
+  designs. The key idea is to derive Bayes factor stopping regions in terms of
+  the \textit{z}-statistic and use the known distribution of the cumulative
+  \textit{z}-statistics to compute stopping probabilities through multivariate
+  normal integration. The resulting method is fast, accurate, and
+  simulation-free. We illustrate it with examples from clinical trials, animal
+  experiments, and psychological studies. We also provide an open-source
+  implementation in the \texttt{bfpwr} R package. Our method makes exploring
+  sequential Bayes factor designs as straightforward as classical group
+  sequential designs, enabling experiments to rapidly design informative and
+  efficient experiments. \\
+  \noindent \textit{Keywords}: Bayesian hypothesis testing, design prior,
+  predictive power, sample size determination, sequential clinical trials
+\end{abstract}
+
+
+\section{Introduction}
+
+A crucial decision in the design of an experiment is choosing the sample size,
+for example, the number of participants, animals, or measurements. A too small
+sample size risks yielding inconclusive results, whereas a too large sample size
+may be too costly, logistically challenging, or ethically problematic.
+Sequential designs have often been proposed as a means to reduce sample size
+\citep{Kairalla2012}. In a sequential design it is possible to stop an
+experiment early on when conclusive evidence is found in an interim analysis.
+For example, a clinical trial may be stopped early if there is evidence that a
+treatment is effective (stopping for efficacy) or if there is evidence that a
+treatment is ineffective or even harmful (stopping for futility).
+
+Despite their appeal, sequential designs pose statistical and practical
+challenges. For example, they can bias parameter estimates \citep{Robertson2022}
+or threaten the integrity of a blinded trial, as interim analyses may require
+preliminary unblinding \citep{Ellenberg2019}. Furthermore, the analysis of
+frequentist sequential designs can be unintuitive. For instance, a final
+\textit{p}-value below the conventional 5\% threshold may still be insufficient
+to declare efficacy if it does not cross a more stringent threshold due to
+repeated analyses. Many practitioners find this difficult to accept, as the same
+data would permit an efficacy claim if only one analysis had been conducted
+\citep{Matthews2006}.
+
+Bayesian methods are often considered as more natural for sequential analyses
+\citep{Cornfield1966, JackLee2012}. Repeated ``updating'' is inherent in the
+Bayesian framework and Bayesian probabilities are, in principle, not affected by
+multiplicity issues \citep[however, see][]{Ryan2020, Zhou2023}. Two popular
+Bayesian approaches to sequential analysis are based on posterior tail
+probabilities \citep[see e.g.,][]{berry2010bayesian, Rosner2020} and Bayes
+factors. Here we focus on sequential Bayes factor designs, which have been
+applied across a wide range of domains, including biomedical research
+\citep{Cornfield1976, Spiegelhalter2004b, Goodman2005, Johnson2009, Li2017,
+  Zhu2019, Zhou2021, Rosner2021, Pourmohamad2022, Linde2023}, the social
+sciences \citep{Schoenbrodt2017, Schoenbrodt2018, Stefan2019, Mani2021,
+  Stefan2022, Stefan2024}, and A/B testing in the tech industry \citep{Deng2016,
+  Lindon2022}. They can also be viewed as Bayesian generalizations of classical
+sequential designs based on likelihood ratios \citep{Wald1947, Siegmund1985,
+  Royall1997}.
+
+The Bayes factor
+\begin{align*}
+  \mathrm{BF}_{01}
+  = \underbrace{\frac{\Pr(H_0 \mid \text{data})}{\Pr(H_1 \mid \text{data})} \bigg / \, \frac{\Pr(H_0)}{\Pr(H_1)}}_{\text{Data-based updating factor}}
+  =  \underbrace{\frac{p(\text{data} \mid H_0)}{p(\text{data} \mid H_1)}}_{\text{Relative predictive performance}}
+\end{align*}
+is the data-based updating factor of the prior odds of two hypotheses $H_0$ and
+$H_1$ to the corresponding posterior odds. This update is dictated by the ratio
+of the data's marginal likelihood under each hypothesis. Thus, the hypothesis
+which better predicts the data receives more support in terms of the Bayes
+factor \citep{Kass1995}. Bayes factors thus provide a direct and interpretable
+measure of relative evidence for $H_0$ and $H_1$, which, unlike posterior
+probabilities, does not depend on the prior probabilities of $H_0$ and $H_1$.
+
+In a sequential Bayes factor design, one fixes two Bayes factor thresholds $k_0
+> 1$ and $k_1 < 1$, the thresholds for $H_0$ and $H_1$, respectively. Common
+choices are symmetric thresholds, such as $k_0 = 1/k_1 = 3$ or $k_0 = 1/k_1 =
+10$, corresponding to ``substantial'' and ``strong'' relative evidence under
+Jeffreys' conventions \citep{Jeffreys:1961}. The experiment is then stopped for
+either $H_0$ or $H_1$ as soon as the Bayes factor exceeds the corresponding
+threshold. If $H_0$ and $H_1$ represents the absence and presence of an effect,
+these rules naturally accommodate stopping for futility and efficacy,
+respectively. Sequential Bayes factor designs thus naturally link the stopping
+decision to a relevant statistical evidence measure.
+
+\begin{figure}[!htb]
+<< "cartoon-seqBF", fig.height = 4.5 >>=
+## drawing a carton of a sequential BF trajectory
+set.seed(14)
+n <- seq(1, 65, 1)
+usd <- sqrt(2)
+pm <- 0
+psd <- 1
+dpm <- pm
+dpsd <- psd
+m <- rnorm(n = 1, mean = dpm, sd = dpsd)
+y <- rnorm(n = n, mean = m, sd = usd)
+z <- sapply(X = n, FUN = function(ni) {
+    est <- mean(y[1:ni])
+    se <- usd/sqrt(ni)
+    est/se
+})
+bf <- sapply(X = n, FUN = function(ni) {
+    est <- mean(y[1:ni])
+    se <- usd/sqrt(ni) #sd(y[1:ni])/sqrt(ni)
+    bfpwr::bf01(estimate = est, se = se, null = 0, pm = pm, psd = psd)
+})
+bks <- c(1/30, 1/10, 1/3, 1, 3, 10)
+labs <- c("1/30", "1/10", "1/3", "1", "3", "10")
+greycol <- adjustcolor(col = 1, alpha.f = 0.5)
+arrowcol <- adjustcolor(col = 1, alpha.f = 0.5)
+
+k0 <- 3
+k1 <- 1/3
+
+layout(rbind(1, 2), heights = c(3.8, 5))
+par(mar = c(0.5, 4, 0.5, 0.5))
+plot(n, bf, type = "n", log = "y", ylab = bquote("Bayes factor BF"["01"]),
+     xlab = "",
+     xaxt = "n",
+     yaxt = "n", ylim = c(1/30, 10))
+abline(h = c(k0, k1), lty = c(2, 3), lwd = c(1, 1.5), col = greycol)
+lines(n, bf, lwd = 1.5, type = "l")
+axis(side = 2, at = bks, labels = labs, las = 1)
+text(x = 4, y = 5, labels = bquote(italic(H[0])), col = greycol)
+text(x = 4, y = 1/5, labels = bquote(italic(H[1])), col = greycol)
+
+par(mar = c(4, 4, 0.5, 0.5))
+zcrit0 <- sapply(X = n, FUN = function(ni) {
+    est <- mean(y[1:ni])
+    se <- usd/sqrt(ni)
+    bfpwr:::zcrit(k = k0, se = se, mu = pm, tau = psd, type = "normal")
+})
+zcrit1 <- sapply(X = n, FUN = function(ni) {
+    est <- mean(y[1:ni])
+    se <- usd/sqrt(ni)
+    bfpwr:::zcrit(k = k1, se = se, mu = pm, tau = psd, type = "normal")
+})
+plot(n, z, type = "n", ylab = bquote(italic(z) * "-statistic"),
+     xlab = bquote("Sample size" ~ italic(n)), las = 1, ylim = c(-3, 3))
+matlines(n, y = t(zcrit0), lty = 2, col = greycol)
+matlines(n, y = t(zcrit1), lty = 3, col = greycol, lwd = 1.5)
+lines(n, z, lwd = 1.5, type = "l")
+text(x = 5, y = 2.8, labels = bquote(italic(H[1])), col = greycol)
+text(x = 5, y = -2.8, labels = bquote(italic(H[1])), col = greycol)
+text(x = 20, y = 0, labels = bquote(italic(H[0])), col = greycol)
+@
+\caption{Illustration of a sequential Bayes factor analysis. The Bayes factor
+  quantifying the evidence for a point null hypothesis $H_0 \colon \theta = 0$
+  against an alternative hypothesis $H_1 \colon \theta \neq 0$ is monitored as
+  data accumulate (top). The bottom plot shows the corresponding $z$-statistic
+  along with the Bayes factor stopping boundaries.}
+\label{fig:bfcartoon}
+\end{figure}
+
+The top plot in Figure~\ref{fig:bfcartoon} shows a simulated trajectory of a
+Bayes factor (oriented in favor of $H_0$ over $H_1$). Initially, the Bayes
+factor fluctuates around 1, indicating absence of evidence for either
+hypothesis. After around 20 observations, the Bayes factor surpasses the
+threshold of 3, indicating substantial evidence for $H_0$ over $H_1$. However,
+after around 50 observations, the Bayes factor quickly decreases below 1/3 and
+1/10 -- as it should since the data were simulated under the alternative
+hypothesis $H_1$. Depending on when the interim analyses were performed, the
+experiment would thus have been erroneously stopped for $H_0$ or correctly
+stopped for $H_1$.
+
+The previous example illustrates the delicate choices that must be made when
+setting up a sequential Bayes factor design. These include choosing Bayes factor
+thresholds $k_0$ and $k_1$, deciding when to perform interim analyses, and
+determining the maximum sample size. Exploring these options can be challenging
+because computing design characteristics is typically only possible through
+Monte Carlo simulation methods. For example, the method implemented in the
+\texttt{BFDA} R package \citep{Schoenbrodt2019} involves analyzing many
+simulated datasets to determine how often an analysis yields correct or
+misleading results. While flexible, these methods are time-consuming and subject
+to Monte Carlo error. This limits the experimenter's freedom in prototyping and
+comparing different designs, which may ultimately result in the use of
+suboptimal designs.
+
+In this paper, we present an alternative perspective on sequential Bayes factor
+designs that provides new insights and enables faster computation of design
+characteristics. The key idea is to consider the Bayes factor as a function of
+the \textit{z}-statistic, the standardized difference between the observed
+parameter estimate and the null value. This allows us to define stopping regions
+in terms of the \textit{z}-statistic (see the bottom plot in
+Figure~\ref{fig:bfcartoon}). Using and extending results from classical group
+sequential designs, this approach enables efficient and deterministic
+computation of design characteristics.
+
+
+In the following Section~\ref{sec:characteristics}, we outline the general
+calculations of sequential Bayes factor design characteristics. We then explain
+a method for calculating design characteristics efficiently and without
+simulation when Bayes factors can be expressed as a function of the
+\textit{z}-statistic (Section~\ref{sec:zstatistic}). Applications to clinical
+trials and animal experiments illustrate how the method can be used in practice
+(Section~\ref{sec:applications}). Section~\ref{sec:ttest} outlines an extension
+to a sequential version of the Bayesian \textit{t}-test used in psychological
+science \citep{Gronau2020}. The paper closes with concluding discussions,
+limitations, and opportunities for future research
+(Section~\ref{sec:discussion}). Appendix~\ref{app:package} illustrates usage of
+our R package \texttt{bfpwr} for planning sequential Bayes factor designs.
+
+\section{Sequential Bayes factor design characteristics}
+\label{sec:characteristics}
+Suppose we want to plan a sequential Bayes factor design with $m$ analyses. At
+each analysis $i = 1, \dots, m$, based on the $n_i$ observations available up to
+that point, a Bayes factor is computed and denoted by $\mathrm{BF}_{01}^i$.
+Suppose that thresholds $k_0 > 1$ and $k_1 < 1$ are used and the experiment is
+stopped as soon as evidence for either $H_0$ ($\mathrm{BF}_{01} \geq k_0$) or
+$H_1$ ($\mathrm{BF}_{01} \leq k_1$) is found. Four quantities are of central
+interest assess the usefulness of a design:
+
+\begin{enumerate}
+\item \textbf{The probability of conclusive evidence for the alternative
+  hypothesis} $(\mathrm{BF}_{01} \leq k_1)$. If data are generated under $H_1$
+  this corresponds to the probability of correct evidence for $H_1$ -- a
+  Bayesian analogue of the frequentist power (true positive rate). If data are
+  generated under $H_0$ this corresponds to the probability of misleading
+  evidence for $H_1$ -- a Bayesian analogue of the false positive (type-I) error
+  rate.
+\item \textbf{The probability of conclusive evidence for the null hypothesis}
+  $(\mathrm{BF}_{01} \geq k_0)$. If data are generated under $H_1$ this
+  corresponds to the probability of misleading evidence for $H_0$ -- a Bayesian
+  analogue of the false negative (type-II error) rate. If data are generated
+  under $H_0$ this corresponds to the probability of correct evidence for $H_0$
+  -- a Bayesian analogue of the true negative rate.
+\item \textbf{The expected sample size at termination}. A lower expected sample
+  size is desired to reduce the actual sample size of the experiment.
+\item \textbf{The standard deviation (or variance) of the sample size at
+  termination}. A lower standard deviation is desired to better anticipate the
+  actual sample size of the experiment.
+\end{enumerate}
+
+Using elementary rules of probability, the probability of finding evidence for
+$H_1$ is
+{\small
+\begin{align*}
+  \small
+  &\Pr(\text{Evidence for} ~ H_1) \\
+  &= \Pr(\mathrm{BF}_{01}^1 \leq k_1) &\text{Evidence for $H_1$ in analysis $1$}\\
+  &\phantom{=} + \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \mathrm{BF}_{01}^2 \leq k_1) &\text{Evidence for $H_1$ in analysis $2$}\\
+  &\phantom{=} \phantom{+} \vdots \\
+  &\phantom{=} + \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \dots, k_1 < \mathrm{BF}_{01}^{m-1} < k_0,  \mathrm{BF}_{01}^m \leq k_1) &\text{Evidence for $H_1$ in analysis $m$.}
+\end{align*}
+}
+\noindent Similarly, the probability of finding evidence for $H_0$ can be expressed as
+{\small
+\begin{align*}
+  &\Pr(\text{Evidence for} ~ H_0) \\
+  &= \Pr(\mathrm{BF}_{01}^1 \geq k_0) &\text{Evidence for $H_0$ in analysis $1$}\\
+  &\phantom{=} + \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \mathrm{BF}_{01}^2 \geq k_0) &\text{Evidence for $H_0$ in analysis $2$}\\
+  &\phantom{=} \phantom{+} \vdots \\
+  &\phantom{=} + \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \dots, k_1 < \mathrm{BF}_{01}^{m-1} < k_0,  \mathrm{BF}_{01}^m \geq k_0) &\text{Evidence for $H_0$ in analysis $m$.}
+\end{align*}
+}
+\noindent The expected sample size is
+{\small
+\begin{align*}
+  \small
+  &\mathrm{E}(n) \\
+  &= n_1 \times \{\Pr(\mathrm{BF}_{01}^1 \leq k_1) + \Pr(\mathrm{BF}_{01}^1 \geq k_0)\} &\text{Stop in analysis $1$}\\
+  &\phantom{=} + n_2 \times  \{ \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \mathrm{BF}_{01}^2 \leq k_1) + \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \mathrm{BF}_{01}^2 \geq k_0)\}
+    &\text{Stop in analysis $2$}\\
+  &\phantom{=} \phantom{+} \vdots \\
+  &\phantom{=} + n_m \times \Pr(k_1 < \mathrm{BF}_{01}^1 < k_0, \dots, k_1 < \mathrm{BF}_{01}^{m-1} < k_0) &\text{Stop in analysis $m$}
+\end{align*}
+}
+\noindent and likewise for $\mathrm{E}(n^2)$, based on which also the variance
+of the sample size can be computed by
+$$\mathrm{Var}(n) = \mathrm{E}(n^2) - \mathrm{E}(n)^2.$$ Each of these
+quantities thus consists of a (weighted) sum of analysis-wise stopping
+probabilities. These stopping probabilities are generally hard to compute due to
+the accumulating data having a complex distribution with dependence across
+analyses. For this reason, Monte Carlo simulation is typically used for
+approximating design characteristics. However, in the following we will show
+that by assuming a particular form of Bayes factor and data, fast and
+simulation-free computation is possible.
+
+\section{\textit{Z}-statistic based Bayes factors}
+\label{sec:zstatistic}
+When testing hypotheses related to an unknown parameter $\theta$, many types of
+Bayes factors $\mathrm{BF}_{01}$ can be expressed as a function of the
+\textit{z}-statistic \mbox{$z = (\hat{\theta} - \theta_0)/\sigma$}, where
+$\hat{\theta}$ is an estimate of $\theta$, $\sigma$ is the estimate's standard
+error (typically of the form $\sigma = \lambda / \sqrt{n}$ with $\lambda^2$ a
+unit variance and $n$ the effective sample size), and $\theta_0$ is the null
+value related to the null hypothesis $H_0$ (typically $\theta_0 = 0$).
+Table~\ref{tab:BFcritical} shows several Bayes factor types for which this is
+possible. These are related to a general class of test statistic based Bayes
+factors \citep{Johnson2005, HeldOtt2018}. Assume now that we are interested in
+the critical \textit{z}-values(s) for which $\mathrm{BF}_{01} = k$ for some $k >
+0.$ For many Bayes factors in Table~\ref{tab:BFcritical}, critical values can be
+derived in closed-form (see the right column).
+
+Although closed-form solutions are convenient, they are not necessary for
+computing design characteristics as described in the following sections. For
+example, the Bayes factor that contrasts a point null hypothesis ($H_0 \colon
+\theta = 0$) with a directional alternative hypothesis ($H_1 \colon \theta > 0$)
+(bottom row in Table~\ref{tab:BFcritical}) does not have an analytically
+available critical \textit{z}-value. However, numerical root-finding can be used
+to determine it, as the Bayes factor can be expressed as a function of the
+\textit{z}-statistic.
+
+\afterpage{
+\begin{landscape}
+\begingroup {\small \renewcommand{\arraystretch}{1.3} % Default value: 1
+\begin{table}[!htb]
+  \centering
+\caption{Different types of Bayes factors for data in the form of an estimate
+  $\hat{\theta}$ of the parameter $\theta$ with standard error $\sigma$, which
+  is assumed to be normally distributed $\hat{\theta} \mid \theta \sim
+  \mathrm{N}(\theta, \sigma^2)$, and the critical values for the corresponding
+  $z$-statistic $z = \hat{\theta}/\sigma$ so that the Bayes factor
+  equals a threshold $\mathrm{BF}_{01} = k$.}
+\label{tab:BFcritical}
+\rowcolors{1}{}{gray!15}
+\resizebox{1\linewidth}{!}{%
+ \begin{tabular}{p{0.5\linewidth} p{0.5\linewidth}}
+    \toprule
+    \multicolumn{1}{c}{\textbf{Bayes factor}} & \multicolumn{1}{c}{\textbf{Critical \textit{z}-value(s)}} \\
+    \midrule
+    Directional null ($H_0 \colon \theta \leq 0$) vs. directional alternative ($H_1 \colon \theta >
+    0$) with marginal normal prior $\theta \sim \mathrm{N}(\mu, \tau^2)$ \newline
+    $$ \mathrm{BF}_{01} = \frac{1 - \Phi(\mu_*/\tau_*)}{\Phi(\mu_*/\tau_*)} \, \bigg / \, \frac{1 - \Phi(\mu/\tau)}{\Phi(\mu/\tau)}$$
+    with $\tau_{*}^2 = 1/(1/\sigma^2 + 1/\tau^2)$ and $\mu_{*} = (z_i/\sigma +
+\mu/\tau^2) \tau^2_{*}$
+    & $$z_{\text{crit}}(k) = \left(\Phi^{-1}\left[\left\{k \, \frac{1 - \Phi(\mu/\tau)}{\Phi(\mu/\tau)} + 1\right\}^{-1}\right] \sqrt{\frac{1}{\sigma^2} + \frac{1}{\tau^2}} - \frac{\mu}{\tau^2}\right) \sigma$$ \\
+    Point null ($H_0 \colon \theta = 0$) vs. point alternative ($H_1 \colon \theta = \mu$)
+    \newline
+    $$\mathrm{BF}_{01}
+    %% = \exp\left[-\frac{1}{2}\left\{z^2 - \left(z -
+    %%   \frac{\mu}{\sigma}\right)^2 \right\}\right]$$ & $$z_{\text{crit}}(k) =
+    %% \frac{\mu^2/\sigma^2 - \log k^2}{2 \mu/\sigma}
+    = \exp\left(\frac{\mu^2}{2\sigma^2} - \frac{z \mu}{\sigma}\right)$$ & $$z_{\text{crit}}(k) =
+    \frac{\mu^2/\sigma^2 - \log k^2}{2 \mu/\sigma}$$ \\
+     Point null ($H_0 \colon \theta = 0$) vs. two-sided alternative ($H_1 \colon \theta \neq
+    0$) with normal prior under alternative $\theta \mid H_1 \sim
+    \mathrm{N}(\mu, \tau^2)$
+    \newline
+    $$\mathrm{BF}_{01} = \sqrt{1 + \frac{\tau^2}{\sigma^2}} \, \exp\left[-\frac{1}{2}\left\{z^2 -
+    \frac{(z - \mu/\sigma)^2}{1 + \tau^2/\sigma^2} \right\}\right]$$
+    & $$z_{\text{crit}-}(k) = M - \sqrt{X} ~~ \text{and} ~~
+  z_{\text{crit}+}(k) = M + \sqrt{X}$$
+  with $M = -\mu\sigma/\tau^2$ \newline and
+  $X = \{\mu^2/\tau^2 + \log(1 + \tau^2/\sigma^2) - \log k^2\}(1 + \sigma^2/\tau^2)$
+\\
+%%     Point null ($H_0 \colon \theta = 0$) vs. two-sided alternative ($H_1 \colon \theta \neq
+%%     0$) with normal moment
+%%     %\footnote{a normal moment prior has density  $\mathrm{NM}(\theta \mid 0, \tau^2) = \mathrm{N}(\theta \mid 0, \tau^2) \times (\theta - 0)^2/\tau^2$ where $\mathrm{N}(\cdot \mid m, v)$ is the normal density function with mean $m$ and variance $v$}
+%% prior under the alternative $\theta \mid H_1 \sim
+%%     \mathrm{NM}(0, \tau^2)$ \newline
+%%     $$\mathrm{BF}_{01} =
+%%   \left(1 + \frac{\tau^{2}}{\sigma^{2}}\right)^{3/2} \, \exp\left\{\frac{-z^{2}}{2(1 + \sigma^{2}/\tau^{2})}\right\} \bigg /  \left(1 + \frac{z^{2}}{1 + \sigma^{2}/\tau^{2}}\right)$$
+%%     & $$z_{\text{crit}-} = -\sqrt{Y} ~~ \text{and} ~~ z_{\text{crit}+} = +\sqrt{Y}$$  \newline
+%%   with $Y = (2\mathrm{W}_0[\{ \sqrt{e}(1 + \tau^2/\sigma^2)^{3/2}\}/(2k)] - 1)(1 + \sigma^2/\tau^2)$ \\
+Point null ($H_0 \colon \theta = 0$) vs. directional alternative ($H_1 \colon \theta >    0$) with truncated normal prior under alternative $\theta \mid H_1 \sim
+    \mathrm{N}(\mu, \tau^2)_{(0, +\infty)}$ where the subscript denotes truncation of the
+distribution to the interval $(0, +\infty)$
+    \newline
+    $$\mathrm{BF}_{01} = \sqrt{1 + \frac{\tau^2}{\sigma^2}} \, \exp\left[-\frac{1}{2}\left\{z^2 -
+    \frac{(z - \mu/\sigma)^2}{1 + \tau^2/\sigma^2} \right\}\right] \, \frac{\Phi(\mu/\tau)}{\Phi(\mu_*/\tau_*)}$$
+    & ~ \newline ~ \newline $z_{\text{crit}}$ not analytically available but can be determined \newline with numerical root-finding
+\\
+%% JZS BF & requires root finding \\
+    \bottomrule
+  \end{tabular}
+  }
+\end{table}
+}
+\endgroup
+\end{landscape}
+}
+
+
+<< "critical-values-example" >>=
+## point null vs. directional alternative BF
+bf0p <- function(z, se, mu, tau) {
+    taup <- 1/sqrt(1/se^2 + 1/tau^2)
+    mup <- (z/se + mu/tau^2)*taup^2
+    sqrt(1 + tau^2/se^2)*exp(-0.5*(z^2 - (z - mu/se)^2/(1 + tau^2/se^2)))*
+        (pnorm(mu/tau)/(pnorm(mup/taup)))
+}
+## ## check that correct BF
+## z <- 2
+## se <- 0.1
+## mu <- 0.1
+## tau <- 0.5
+## bf0p(z = z, se = se, mu = mu, tau = tau)
+## dnorm(z*se, 0, se)/integrate(f = function(x) {
+##         dnorm(z*se, x, se)*dnorm(x, mu, tau)/(1 - pnorm(0, mu, tau))
+##     }, lower = 0, upper = Inf)$value
+
+
+n <- seq(50, 250, 50)
+## get critical z-values from group sequential designs
+zP <- getDesignGroupSequential(kMax = length(n), informationRates = n/max(n),
+                               alpha = 0.025, sided = 1,
+                               typeOfDesign = "P")$criticalValues
+zOF <- getDesignGroupSequential(kMax = length(n), informationRates = n/max(n),
+                                alpha = 0.025, sided = 1,
+                                typeOfDesign = "OF")$criticalValues
+
+## get critical z-values from sequential BF designs
+k1 <- 1/10
+k0 <- 3
+se <- sqrt(2/n)
+pm0 <- 0
+pm1 <- 0.1
+psd <- 1
+pm2 <- 0.5
+resnormal <- pbf01seq(n = n, k1 = k1, k0 = k0, se = sqrt(2/n), pm = pm0,
+                      psd = psd, type = "normal", strict = FALSE)
+resdirectional <- pbf01seq(n = n, k1 = k1, k0 = k0, se = sqrt(2/n), pm = 0,
+                           psd = psd, type = "directional", strict = FALSE)
+respoint1 <- pbf01seq(n = n, k1 = k1, k0 = k0, se = sqrt(2/n), pm = pm1,
+                      psd = 0, type = "normal", strict = FALSE)
+respoint2 <- pbf01seq(n = n, k1 = k1, k0 = k0, se = sqrt(2/n), pm = pm2,
+                      psd = 0, type = "normal", strict = FALSE)
+resmoment <- pbf01seq(n = n, k1 = k1, k0 = k0, se = sqrt(2/n), psd = pm2/sqrt(2),
+                      dpm = pm, type = "moment", strict = FALSE)
+resJZS <- ptbf01seq(n = n, k1 = k1, k0 = k0, plocation = pm0, pscale = 1/sqrt(2),
+                    pdf = 1, dpm = pm, type = "two.sample",
+                    alternative = "two.sided", strict = FALSE)
+res0p <- sapply(X = se, FUN = function(se) {
+    uniroot(f = function(z) {
+        bf0p(z = z, se = se, mu = pm0, tau = psd) - k1
+    }, interval = c(0, 10), tol = .Machine$double.eps)$root
+})
+zDF <- rbind(
+    ## data.frame(n = n, z = resnormal$zk1[2,],
+    ##            type = paste0("'BF:' ~ italic(H[0]) * ':' ~ theta == 0 ~ 'vs.' ~ italic(H[1]) * ':' ~ theta == 0 ~ 'with' ~ italic(k[1]) == 1/", 1/k1)),
+    ## data.frame(n = n, z = resmoment$zk1[2,], type = "'BF: Moment'"),
+    data.frame(n = n, z = resdirectional$zk1,
+               type = paste0("'BF:' ~ italic(H[0]) * ':' ~ theta <= 0 ~ 'vs.' ~ italic(H[1]) * ':' ~ theta > 0 ~ 'with' ~  theta %~%  'N(' *", pm0, "* ',' ~ ",
+                              psd, "* ') and' ~ italic(k[1]) == 1/", 1/k1)),
+    data.frame(n = n, z = respoint1$zk1,
+               type = paste0("'BF:' ~ italic(H[0]) * ':' ~ theta == 0 ~ 'vs.' ~ italic(H[1]) * ':' ~ theta ==", pm1, "~ 'with' ~ italic(k[1]) == 1/", 1/k1)),
+    data.frame(n = n, z = res0p,
+               type = paste0("'BF:' ~ italic(H[0]) * ':' ~ theta == 0 ~ 'vs.' ~ italic(H[1]) * ':' ~ theta > 0 ~ 'with' ~  theta ~ '|' ~ italic(H[1]) %~%  'N(' *", pm0, "* ',' ~ ",
+                              psd, "* ')'[(0 * ',' ~ +infinity)] ~ 'and' ~ italic(k[1]) == 1/", 1/k1)),
+    ## data.frame(n = n, z = respoint2$zk1,
+    ##            type = paste0("'BF:' ~ italic(H[0]) * ':' ~ theta == 0 ~ 'vs.' ~ italic(H[1]) * ':' ~ theta ==", pm2, "~ 'with' ~ italic(k[1]) == 1/", 1/k1)),
+    ## data.frame(n = n, z = resJZS$zk1[2,], type = "'BF: JZS'"),
+    data.frame(n = n, z = zP,
+               type = "'GSD: Pocock with' ~ alpha == 0.025"),
+    data.frame(n = n, z = zOF,
+               type = '"GSD: O\'Brien-Fleming with" ~ alpha == 0.025')
+)
+@
+
+Figure~\ref{fig:BFcritical} shows criticial \textit{z}-values associated with
+different Bayes factors indicating strong evidence for the alternative over the
+null hypothesis ($\mathrm{BF}_{01} = 1/\Sexpr{1/k1}$). The critical values from
+two commonly used group sequential design (GSD) methods, Pocock and
+O'Brien-Fleming, are shown as comparison. Both ensure control of the type-I
+error rate at the conventional $\alpha = 0.025$ (one-sided) in a sequential
+design with \Sexpr{length(n)} equally-spaced analyses. We can see that the value
+and shape of the critical value boundaries differs across the different Bayes
+factors. The directional null ($H_0 \colon \theta \leq 0$) vs. directional
+alternative ($H_1 \colon \theta > 0$) Bayes factor (black) shows near constant
+critical values across all analyses. In contrast, the point null ($H_0 \colon
+\theta = 0$) vs. point alternative ($H_1 \colon \theta = \Sexpr{pm1}$) Bayes
+factor shows decreasing critical values (yellow), while the point null ($H_0
+\colon \theta = 0$) vs. directional alternative ($H_1 \colon \theta > 0$) Bayes
+factor shows increasing critical values (light-blue). The constant Pocock GSD
+critical values (green) thus align with the shape of the directional null vs.
+directional alternative Bayes factor (black) whereas the O'Brien-Fleming GSD
+critical values (dark-blue) align with the shape of the point null vs. point
+alternative Bayes factor (yellow).
+\begin{figure}[!htb]
+<< "critical-values-plot", fig.height = 3.2 >>=
+ggplot(data = zDF, aes(x = n, y = z, color = type)) +
+    geom_line(alpha = 0.4, linewidth = 1) +
+    geom_point(size = 2, alpha = 0.9) +
+    scale_color_manual(values = palette.colors(n = length(unique(zDF$type)) + 1)[-5],
+                       labels = scales::label_parse()) +
+    guides(color = guide_legend(nrow = 3)) +
+    ## expand_limits(y = 0) +
+    labs(x = "Sample size per group",
+         y = bquote("Critical" ~ italic(z) * "-value"), color = "") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "top")
+@
+\caption{Critical \textit{z}-values where $\mathrm{BF}_{01} = 1/\Sexpr{1/k1}$
+  for different types of Bayes factors (BF) from Table~\ref{tab:BFcritical} and
+  group sequential designs (GSD). The tested parameter is the standardized mean
+  difference between two normally distributed populations with know variance and
+  standard error of the form $\sigma = \sqrt{2/n}$ where $n$ is the sample size
+  per group.}
+\label{fig:BFcritical}
+\end{figure}
+
+
+\subsection{\textit{Z}-statistic stopping regions}
+Denote by $z_i$ the \textit{z}-value at analysis $i$ and by
+$z_{i,\text{crit}}(k)$ the critical value(s) for which the Bayes factor equals
+the threshold $\mathrm{BF}_{01} = k$. For Bayes factors with only one critical
+\textit{z}-value (e.g., directional null vs. directional alternative) the $H_0$
+stopping condition $\mathrm{BF}_{01}^i \geq k_0$ is equivalent to $z_i \leq
+z_{i,\text{crit}}(k_0)$ whereas the $H_1$ stopping condition $\mathrm{BF}_{01}^i
+\leq k_1$ corresponds to $z_i \geq z_{i,\text{crit}}(k_1)$. The continuation
+condition $k_1 < \mathrm{BF}_{01}^i < k_0$ is equivalent to
+$z_{i,\text{crit}}(k_0) < z_i < z_{i,\text{crit}}(k_1)$. This means that the
+\textit{z}-statistic stopping region at analysis $i$ for the vector of
+cumulative \textit{z}-statistics $(Z_1, \dots, Z_i)^\top$ consists of an
+$i$-dimensional rectangle (an ``$i$ hyper-rectangle''). Integrating this region
+over the joint distribution of the $z$-statistics gives the probability to stop
+at analysis $i$. For example, for $i = 1$ this is simply the interval
+$[z_{1,\text{crit}}(k_1), +\infty)$ while for $i = 2$ we have the rectangle
+  $(z_{1,\text{crit}}(k_0), z_{1,\text{crit}}(k_1)) \times
+  [z_{2,\text{crit}}(k_1), +\infty)$, see the blue and green regions in the left
+    plot in Figure~\ref{fig:2dz}.
+
+
+\begin{figure}[!htb]
+<< "plot-critical-z-values", fig.height = 6, fig.width = 11 >>=
+## function to compute critical z-values for Bayes factors
+zcrit <- function(k, i, mu, tau, type = "point") {
+    if (type == "point") {
+        if (tau == 0) {
+            zcrit <- (i*mu^2 - log(k^2))/(2*sqrt(i)*mu)
+        } else {
+            A <- (mu^2/tau^2 + log(1 + tau^2*i) - log(k^2))*(1 + 1/(tau^2*i))
+            M <- -mu/(sqrt(i)*tau^2)
+            zcrit <- M + c(-1, 1)*sqrt(A)
+        }
+    } else if (type == "directional") {
+        priorodds <- 1/pnorm(mu/tau) - 1
+        zcrit <- (qnorm(1/(k*priorodds + 1))*sqrt(i + 1/tau^2) -
+                  mu/tau^2)/sqrt(i)
+    } else if (type == "moment") {
+        Y <- (2*lamW::lambertW0(x = exp(0.5)*(1 + tau^2*i)^(3/2)/(2*k)) - 1)*(1 + 1/(i*tau^2))
+        zcrit <- c(-1, 1)*sqrt(Y)
+    } else {
+        stop("supplied type not implemented")
+    }
+    return(zcrit)
+}
+
+z1seq <- z2seq <- seq(-4, 4, length.out = 10)
+mua <- 0
+n <- c(50, 100)
+inf <- n/2
+
+## colors for analysis-wise success regions
+alph <- 0.4
+col1 <- adjustcolor(col = "#0072B2", alpha.f = alph)
+col2 <- adjustcolor(col = "#009E73", alpha.f = alph)
+col3 <- adjustcolor(col = "#D55E00", alpha.f = alph)
+col4 <- adjustcolor(col = "#CC79A7", alpha.f = alph)
+
+par(mfrow = c(1, 2))
+## only one critical value: point null vs. point alternative / directional testing
+k0 <- 10
+k1 <- 1/10
+zcrit01 <- zcrit(k = k0, i = inf[1], mu = mua, tau = 0.5, type = "directional")
+zcrit02 <- zcrit(k = k0, i = inf[2], mu = mua, tau = 0.5, type = "directional")
+zcrit11 <- zcrit(k = k1, i = inf[1], mu = mua, tau = 0.5, type = "directional")
+zcrit12 <- zcrit(k = k1, i = inf[2], mu = mua, tau = 0.5, type = "directional")
+plot(z1seq, z2seq, type = "n", las = 1, pty = "s",
+     xlab = bquote(italic(z)[1] ~ "(" * italic(z) * "-statistic at analysis 1)"),
+     ylab = bquote(italic(z)[2] ~ "(" * italic(z) * "-statistic at analysis 2)"),
+     xaxt = "n", yaxt = "n",
+     main = "One critical value")
+     ## main = "One critical value:\n point/directional null vs. point/directional alternative")
+## Pr(BF01^1 < k1)
+xpH11 <- c(zcrit11, 100, 100, zcrit11)
+ypH11 <- c(-100, -100, 100, 100)
+text(x = zcrit11 + 0.5, y = 0,
+     labels = bquote("Pr(BF"["01"]^"1" < italic(k)[1] * ")"), adj = 0)
+## Pr(k0 > BF01^1 > k1, BF01^2 < k1)
+xpH12 <- c(zcrit01, zcrit11, zcrit11, zcrit01)
+ypH12 <- c(zcrit12, zcrit12, 100, 100)
+text(x = zcrit01 + 0.1, y = zcrit12 + 1.5,
+     labels = bquote(atop("Pr(" * italic(k)[1] ~ "< BF"["01"]^"1" ~ "<" ~ italic(k)[0] * ",",
+                          "BF"["01"]^"2" < italic(k)[1] * ")")),
+     adj = 0)
+## Pr(BF01^1 > k0)
+xpH01 <- c(-100, zcrit01, zcrit01, -100)
+ypH01 <- c(-100, -100, 100, 100)
+text(x = zcrit01 - 0.5, y = 0,
+     labels = bquote("Pr(BF"["01"]^"1" > italic(k)[0] * ")"), adj = 1)
+## Pr(k0 > BF01^1 > k1, BF01^2 < k1)
+xpH02 <- c(zcrit01, zcrit11, zcrit11, zcrit01)
+ypH02 <- c(zcrit02, zcrit02, -100, -100)
+text(x = zcrit01 + 0.1, y = zcrit02 - 1.5,
+     labels = bquote(atop("Pr(" * italic(k)[1] ~ "< BF"["01"]^"1" ~ "<" ~ italic(k)[0] * ",",
+                          "BF"["01"]^"2" > italic(k)[0] * ")")),
+     adj = 0)
+polygon(xpH11, ypH11, col = col1, border = FALSE)
+polygon(xpH12, ypH12, col = col2, border = FALSE)
+polygon(xpH01, ypH01, col = col3, border = FALSE)
+polygon(xpH02, ypH02, col = col4, border = FALSE)
+abline(v = c(zcrit01, zcrit11), lty = c(3, 2), lwd = 1.5)
+abline(h = c(zcrit02, zcrit12), lty = c(3, 2), lwd = 1.5)
+axis(side = 1, at = c(zcrit01, zcrit11),
+     labels = c(expression(italic(z)["1,crit"](italic(k)[0])),
+                expression(italic(z)["1,crit"](italic(k)[1]))))
+axis(side = 2, at = c(zcrit02, zcrit12),
+     labels = c(expression(italic(z)["2,crit"](italic(k)[0])),
+                expression(italic(z)["2,crit"](italic(k)[1]))))
+
+## two critical values: point null vs. normal alternative
+k0 <- 2
+zcrit01 <- zcrit(k = k0, i = inf[1], mu = mua, tau = 0.5, type = "point")
+zcrit02 <- zcrit(k = k0, i = inf[2], mu = mua, tau = 0.5, type = "point")
+zcrit11 <- zcrit(k = k1, i = inf[1], mu = mua, tau = 0.5, type = "point")
+zcrit12 <- zcrit(k = k1, i = inf[2], mu = mua, tau = 0.5, type = "point")
+plot(z1seq, z2seq, type = "n", las = 1, pty = "s",
+     xlab = bquote(italic(z)[1] ~ "(" * italic(z) * "-statistic at analysis 1)"),
+     ylab = bquote(italic(z)[2] ~ "(" * italic(z) * "-statistic at analysis 2)"),
+     xaxt = "n", yaxt = "n",
+     main = "Two critical values")
+     ## main = "Two critical values:\n point null vs. normal alternative")
+abline(v = c(zcrit01, zcrit11), lty = c(3, 3, 2, 2), lwd = 1.5)
+abline(h = c(zcrit02, zcrit12), lty = c(3, 3, 2, 2), lwd = 1.5)
+## Pr(BF01^1 < k1)
+xpH11a <- c(zcrit11[1], -100, -100, zcrit11[1])
+ypH11a <- c(-100, -100, 100, 100)
+xpH11b <- c(zcrit11[2], 100, 100, zcrit11[2])
+ypH11b <- c(-100, -100, 100, 100)
+polygon(xpH11a, ypH11, col = col1, border = FALSE)
+polygon(xpH11b, ypH11, col = col1, border = FALSE)
+## Pr(k0 > BF01^1 > k1, BF01^2 < k1)
+xpH12a <- c(zcrit01[1], zcrit11[1], zcrit11[1], zcrit01[1])
+ypH12a <- c(zcrit12[1], zcrit12[1], -100, -100)
+xpH12b <- c(zcrit01[1], zcrit11[1], zcrit11[1], zcrit01[1])
+ypH12b <- c(zcrit12[2], zcrit12[2], 100, 100)
+xpH12c <- c(zcrit01[2], zcrit11[2], zcrit11[2], zcrit01[2])
+ypH12c <- c(zcrit12[2], zcrit12[2], 100, 100)
+xpH12d <- c(zcrit01[2], zcrit11[2], zcrit11[2], zcrit01[2])
+ypH12d <- c(zcrit12[1], zcrit12[1], -100, -100)
+polygon(xpH12a, ypH12a, col = col2, border = FALSE)
+polygon(xpH12b, ypH12b, col = col2, border = FALSE)
+polygon(xpH12c, ypH12c, col = col2, border = FALSE)
+polygon(xpH12d, ypH12d, col = col2, border = FALSE)
+## Pr(BF01^1 > k0)
+xpH01 <- c(zcrit01[1], zcrit01[1], zcrit01[2], zcrit01[2])
+ypH01 <- c(100, -100, -100, 100)
+polygon(xpH01, ypH01, col = col3, border = FALSE)
+## Pr(k0 > BF01^1 > k1, BF01^2 < k1)
+xpH02a <- c(zcrit01[1], zcrit11[1], zcrit11[1], zcrit01[1])
+ypH02a <- c(zcrit02[1], zcrit02[1], zcrit02[2], zcrit02[2])
+xpH02b <- c(zcrit01[2], zcrit11[2], zcrit11[2], zcrit01[2])
+ypH02b <- c(zcrit02[1], zcrit02[1], zcrit02[2], zcrit02[2])
+polygon(xpH02a, ypH02a, col = col4, border = FALSE)
+polygon(xpH02b, ypH02b, col = col4, border = FALSE)
+axis(side = 1, at = c(zcrit01, zcrit11),
+     labels = c(expression(italic(z)["1,crit-"](italic(k)[0])),
+                expression(italic(z)["1,crit+"](italic(k)[0])),
+                expression(italic(z)["1,crit-"](italic(k)[1])),
+                expression(italic(z)["1,crit+"](italic(k)[1]))))
+axis(side = 2, at = c(zcrit02, zcrit12),
+     labels = c(expression(italic(z)["2,crit-"](italic(k)[0])),
+                expression(italic(z)["2,crit+"](italic(k)[0])),
+                expression(italic(z)["2,crit-"](italic(k)[1])),
+                expression(italic(z)["2,crit+"](italic(k)[1]))))
+@
+\caption{Illustration of critical \textit{z}-values such that $\mathrm{BF}_{01}
+  \geq k_0$ (dotted lines) and $\mathrm{BF}_{01} \leq k_1$ (dashed lines) for
+  Bayes factors with one critical value (left) and two critical values (right)
+  such that $\mathrm{BF}_{01} = k$. Integrating the colored regions produces the
+  indicated analysis-wise stopping probabilitites. For example, integrating the
+  green region gives the probability to not stop in the first analysis but stop
+  for $H_1$ in the second analysis.}
+\label{fig:2dz}
+\end{figure}
+
+For Bayes factors with two critical values (e.g., point null vs. two-sided
+alternative), the conditions are more complicated. The $H_0$ stopping condition
+$\mathrm{BF}_{01}^i \geq k_0$ is equivalent to the $z$-statistic being in the
+interval around zero $z_i \in [z_{i,\text{crit}-}(k_0),
+z_{i,\text{crit}+}(k_0)]$ whereas the $H_1$ stopping condition
+$\mathrm{BF}_{01}^i \leq k_1$ corresponds to the $z$-statistic being outside the
+interval $z_i \not\in (z_{i,\text{crit}-}(k_1), z_{i,\text{crit}+}(k_1))$. The
+continuation condition $k_1 < \mathrm{BF}_{01}^i < k_0$ is equivalent to the
+$z$-statistic being in between these two regions $z_i \in
+(z_{i,\text{crit}-}(k_1), z_{i,\text{crit}-}(k_0)) \cup
+(z_{i,\text{crit}+}(k_0), z_{i,\text{crit}+}(k_1))$.
+%% (z_{i,\text{crit}-}(k_1), z_{i,\text{crit}+}(k_1)) \setminus
+%% (z_{i,\text{crit}-}(k_0), z_{i,\text{crit}+}(k_0))$.
+This means that at analysis $i$, the stopping region consist of the union of
+multiple $i$ hyper-rectangles, their number doubling with each analysis. For
+example, in analysis $1$ we have two intervals of $z$-statistics for which the
+Bayes factor is $\mathrm{BF}_{01} \leq k_1$, see the blue regions in the right
+plot of Figure~\ref{fig:2dz}. In analysis 2, the number of rectangles doubles to
+four (green rectangles in the right plot of Figure~\ref{fig:2dz}). This means
+that with an increasing number of interim analyses, the number of
+hyper-rectangles grows exponentially as every $i$ hyper-rectangle at analysis
+$i$ splits into two $i + 1$ hyper-rectangles at analysis $i + 1$.
+
+While the exponentially growing number of hyper-rectangles poses certain
+computational challenges, we did not observe any numerical issues when
+exhaustively computing the probability of all hyper-rectangles in designs with
+even up to ten analyses. In many fields, carrying out so many analyses is
+unrealistic. For example, one or two interim analyses are by far the most common
+number of analyses in sequential clincial trials \citep{Stevely2015}.
+Nevertheless, for designs with lots of analyses, it is often sufficient to
+compute the probability of only the two hyper-rectangles where the sign of the
+$z$-statistics stays constant across analyses. The probability of the remaining
+hyper-rectangles is usually very small as it is unlikely that the $z$-statistic
+will repeatedly change its sign because of the correlation of $z$-statistics
+across analyses.
+
+\subsection{The predictive distribution of the \textit{z}-statistics}
+\label{sec:canonical}
+In order to compute the probability for the \textit{z}-statistics to fall within
+a given region, we need to know their distribution. Suppose that $m$ analyses
+produce the sequence of \textit{z}-statistics $\{Z_1, \dots, Z_m\}$. Under
+typical conditions, these have a \emph{canonical distribution}
+\citep{Jennison1999}, that is, is a distribution of the form
+\begin{enumerate}
+  \item $\boldsymbol{Z} = (Z_1, \dots, Z_m)^\top$ has a $m$-variate normal distribution
+  \item $\mathrm{E}(\boldsymbol{Z}) = \theta \boldsymbol{I}$ where $\theta$ is
+    the true parameter and $\boldsymbol{I} = (\sqrt{I_1}, \dots,
+    \sqrt{I_m})^\top$ is the vector of square-rooted information levels. The
+    information level is typically the inverse of the squared standard error
+    $\sigma^2$. For example, for a normal mean, the information level is $I_i =
+    1/\sigma^2 = n_i/\lambda^2$, where $n_i$ is the sample size at analysis $i$
+    and $\lambda^2$ the known variance of one observation.
+  \item $\mathrm{Cov}(Z_i, Z_{i+j}) = \boldsymbol{\Sigma}_{i,i+j} =
+    \sqrt{I_i/I_{i+j}}$ for $j \geq 0$. For example, for a normal mean the
+    covariance is $\mathrm{Cov}(Z_i, Z_{i+j}) = \sqrt{n_i/n_{i+j}}$.
+\end{enumerate}
+In short, the vector of \textit{z}-statistics has distribution
+\begin{align}
+  \label{eq:zmarginal}
+  \boldsymbol{Z} \mid \theta \sim \mathrm{N}_m\left(\theta \boldsymbol{I},
+  \boldsymbol{\Sigma}\right).
+\end{align}
+
+Assuming a fixed value for $\theta$, one can compute the probability of a
+\textit{z}-statistic vector falling into a given stopping region using standard
+numerical approaches for calculating multivariate normal integrals. Due to the
+canonical distribution, this calculation can even be further simplified via a
+recursive one-dimensional integration algorithm, which is also used extensively
+in the calculation of stopping probabilities in classical group sequential
+designs \citep{Armitage1969, Jennison1999}. However, from a Bayesian
+perspective, it seems more natural to account for uncertainty of $\theta$ by
+specifying a \emph{design prior} distribution \citep{OHagan2001b}, sometimes
+also known as sampling prior \citep{wang2002, Psioda2018}, instead of a fixed
+value. Taking the design prior to be a normal prior $\theta \sim
+\mathrm{N}(\mu_d, \tau_d^2)$, the marginal (or prior-predictive) distribution of
+$\boldsymbol{Z}$ is then
+\begin{align}
+  \label{eq:zmarginal}
+  \boldsymbol{Z} \mid \mu_d, \tau_d^2 \sim \mathrm{N}_m\left(\mu_d \boldsymbol{I} ,
+  \boldsymbol{\Sigma} + \tau_d^2 \boldsymbol{I} \boldsymbol{I}^\top\right),
+\end{align}
+see Appendix~\ref{app:zmarginal} for a derivation. The
+distribution~\eqref{eq:zmarginal} reduces again to the canonical distribution
+if a point prior at $\mu_d$ is assigned (i.e., if $\tau_d \downarrow 0$).
+However, for non-degenerate priors ($\tau_d > 0$), the vector of accumulating
+test statistics $\boldsymbol{Z}$ exhibits higher correlations than under the
+canonical distribution, which increases with increasing $\tau$.
+%% It therefore does not have independent increments and is thus no Brownian
+%% motion.
+
+In contrast to the analysis prior, which is typically only
+``weakly-informative'' or ``objective'' in some sense, the design prior should
+represent genuine knowledge and uncertainty at the design analysis in order to
+accurately estimate stopping probabilities and sample sizes. However, setting
+the design prior to a point mass ($\tau_d \downarrow 0$) allows us to study the
+frequentist operating characteristics of the sequential design. For example,
+specifying a point prior at $\mu_d = 0$ and computing the probability to find
+evidence for $H_1$ gives the frequentist type-I error rate. Despite the fact
+that this probability may be unrealistic from a Bayesian perspective, showing
+that a sequential Bayes factor design is appropriately calibrated (i.e., has
+type-I error rate below a conventional level, e.g., 5\%) may be required from
+certain stakeholders, such as a regulatory authorities in drug development
+\citep{FDA2010, Campbell2020}.
+
+Assuming there are $m$ analyses, the probability of evidence for $H_i \in \{H_0, H_1\}$ is
+\begin{align*}
+  \Pr(\text{Evidence for}~ H_i) =
+  \sum_{j=1}^m \Pr\{\boldsymbol{Z}_{1:j} \in \boldsymbol{S}_j \mid \mu_d \boldsymbol{I}_{1:j},
+  (\boldsymbol{\Sigma} + \tau_d^2 \boldsymbol{I} \boldsymbol{I}^\top)_{1:j,1:j}\}
+\end{align*}
+where $1:j$ indicates indexing of the first $j$ elements and $\boldsymbol{S}_j$
+is the set of $z$-statistic stopping regions at analysis $j$. For example, assuming that $m = 3$ and that there
+is only one critical value so that $\mathrm{BF}_{01} = k$ (e.g., a directional
+null vs. directional alternative Bayes factor in Table~\ref{tab:BFcritical}), we
+have the stopping regions for $H_1$
+\begin{align*}
+  &\boldsymbol{S}_1 = [z_{1,\text{crit}}(k_1), +\infty]&
+  &\boldsymbol{S}_2 =
+  \begin{bmatrix}
+    z_{1,\text{crit}}(k_0), & z_{1,\text{crit}}(k_1) \\
+    z_{2,\text{crit}}(k_1), & +\infty \\
+  \end{bmatrix}&
+  &\boldsymbol{S}_3 =
+  \begin{bmatrix}
+    z_{1,\text{crit}}(k_0), & z_{1,\text{crit}}(k_1) \\
+    z_{2,\text{crit}}(k_0), & z_{2,\text{crit}}(k_0) \\
+    z_{3,\text{crit}}(k_1), & +\infty \\
+  \end{bmatrix}&
+\end{align*}
+corresponding to hyper-rectangles in one-, two-, and three-dimensional space.
+While under the canonical distribution, these probabilities could be expressed
+as recursive one-dimensional integrals, this is not possible anymore with design
+priors where \mbox{$\tau_d > 0$} due to the distribution not being canonical
+anymore. However, we have found that computation of even very large-dimensional
+integrals (e.g., designs with 20 analyses, which is unrealistic in practice) is
+still very efficient with modern implementations of the multivariate normal
+distribution, such as the \texttt{mvtnorm} R package \citep{Genz2009}. Such
+extreme designs will be demonstrated in Sections~\ref{sec:rat}
+and~\ref{sec:ttest}.
+
+\section{Applications}
+\label{sec:applications}
+We will now illustrate planning of sequential Bayes factor designs using case
+studies from clinical trials and animal experiments.
+
+\subsection{The Low-PV trial}
+
+<< "low-PV-trial-data" >>=
+## https://doi.org/10.1016/S2352-3026(20)30373-2
+## https://ars.els-cdn.com/content/image/1-s2.0-S2352302620303732-mmc1.pdf
+
+## H1: p0 = 0.5 and p1 = 0.75
+p0H1 <- 0.5
+p1H1 <- 0.75
+ORH1 <- (p1H1/(1 - p1H1)) / (p0H1/(1 - p0H1))
+
+a1 <- 21
+b1 <- 24 - 21
+c1 <- 15
+d1 <- 26 - 15
+logOR1 <- log(a1*d1/(b1*c1))
+selogOR1 <- sqrt(1/a1 + 1/b1 + 1/c1 + 1/d1)
+z1 <- logOR1/selogOR1
+## ## reported OR estimate 5.1 corresponds to this
+OR1 <- exp(logOR1)
+OR1ci <- exp(logOR1 + c(-1, 1)*selogOR1*1.96) # doesn't correspond to 1.1 to 32.5
+## ## CI corresponds to this
+## fisher.test(matrix(c(a1, b1, c1, d1), byrow = TRUE, ncol = 2))
+## Epi::twoby2(matrix(c(a1, b1, c1, d1), byrow = TRUE, ncol = 2))
+pm <- log(ORH1)
+psd <- 0
+bf1 <- bfpwr::bf01(estimate = logOR1, se = selogOR1, null = 0, pm = pm,
+                   psd = psd)
+a2 <- 42
+b2 <- 50 - 42
+c2 <- 30
+d2 <- 50 - 30
+logOR2 <- log(a2*d2/(b2*c2))
+selogOR2 <- sqrt(1/a2 + 1/b2 + 1/c2 + 1/d2)
+z2 <- logOR2/selogOR2
+## ## reported OR estimate 3.5 corresponds to this
+OR2 <- exp(logOR2)
+OR2ci <- exp(logOR2 + c(-1, 1)*selogOR2*1.96) # doesn't correspond to 1.3 to 10.4
+## ## CI corresponds to this
+## fisher.test(matrix(c(a2, b2, c2, d2), byrow = TRUE, ncol = 2))
+## Epi::twoby2(matrix(c(a2, b2, c2, d2), byrow = TRUE, ncol = 2))
+bf2 <- bfpwr::bf01(estimate = logOR2, se = selogOR2, null = 0,  pm = pm,
+                   psd = psd)
+
+## OF stopping boundaries
+zcritFut <- c(-3.7307, -2.5262, -1.9917)
+zcritEff <- c(3.7307, 2.5262, 1.9917)
+## rpact::getDesignGroupSequential(informationRates = c(0.33, 0.66, 1),
+##                                 alpha = 0.025, typeOfDesign = "asOF")
+@
+
+The Low-PV trial \citep{Barbui2021} assessed if the drug ropeginterferon alfa-2b
+could help low-risk polycythaemia vera (Low-PV) patients kepping haematocrit
+levels (the volume percentage of red blood cells in blood) withing a safe range.
+The study was designed to have three analyses after 50, 100, and 150 patients
+had been followed-up, respectively. The design assumed response rates of $\pi_0
+= \Sexpr{round(100*p0H1, 1)}\%$ and $\pi_1 = \Sexpr{round(100*p1H1, 1)}\%$ in
+the control and treatment groups, corresponding to an odds ratio of $\mathrm{OR}
+= \Sexpr{round(ORH1, 1)}$. The study was stopped after the second interim
+analysis because the group sequential stopping bounds for efficacy were crossed.
+Table~\ref{tab:lowpv} summarizes the by-analysis results.
+
+\begin{table}[!htb]
+  \centering
+  \caption{Results from the Low-PV trial \citep{Barbui2021}. Shown are
+    by-analysis sample sizes ($n$) and estimated probabilities ($\pi$) in
+    control (subscript 0) and treatment groups (subscript 1), respectively,
+    along with estimated odds ratio (OR) with corresponding 95\% confidence
+    interval (CI), \textit{z}-value, and decision based on group sequential
+    stopping bounds. The right-most column gives the Bayes factor contrasting
+    $H_0 \colon \mathrm{OR} = 1$ to $H_1 \colon \mathrm{OR} = \Sexpr{exp(pm)}$
+    based on an approximately normal likelihood of the estimated log OR.}
+  \label{tab:lowpv}
+%% \rowcolors{1}{}{gray!15}
+<< "Low-PV-trial-table", results = "asis" >>=
+## BF sequential design based on logOR
+k1 <- 1/10
+k0 <- 10
+n <- c(25, 50, 75)
+se <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p1H1*(1 - p1H1)*n))
+bfdesignH1 <- bfpwr::pbf01seq(k1 = k1, k0 = k0, se = se, n = n, pm = pm,
+                              psd = psd, dpm = pm, dpsd = 0, type = "normal")
+bfdesignH0 <- bfpwr::pbf01seq(k1 = k1, k0 = k0, se = se, n = n, pm = pm,
+                              psd = psd, dpm = 0, dpsd = 0, type = "normal")
+## bfdesignH1$zk0
+## bfdesignH1$zk1
+## plot(bfdesignH1)
+zk1 <- bfpwr:::zcrit(k = k1, se = c(selogOR1, selogOR2), mu = pm, tau = psd,
+                     type = "normal")
+zk0 <- bfpwr:::zcrit(k = k0, se = c(selogOR1, selogOR2), mu = pm, tau = psd,
+                     type = "normal")
+
+## BF sequential design based on asin-sqrt difference
+k1 <- 1/10
+k0 <- 10
+n <- c(25, 50, 75)
+se <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p1H1*(1 - p1H1)*n))
+se0 <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p0H1*(1 - p0H1)*n))
+bfdesignH1 <- bfpwr::pbf01seq(k1 = k1, k0 = k0, se = se, n = n, pm = pm,
+                              psd = psd, dpm = pm, dpsd = 0, type = "normal")
+bfdesignH0 <- bfpwr::pbf01seq(k1 = k1, k0 = k0, se = se0, n = n, pm = pm,
+                              psd = psd, dpm = 0, dpsd = 0, type = "normal")
+
+formatround <- function(x, digits) {
+    format(round(x, digits = digits), nsmall = digits)
+}
+restable <- data.frame(
+    analysis = c("1", "2"),
+    n0 = as.character(c(c1 + d1, c2 + d2)),
+    n1 = as.character(c(a1 + b1, a2 + b2)),
+    p0 = paste0(formatround(100*c(c1/(c1 + d1), c2/(c2 + d2)), 1), "\\%"),
+    p1 = paste0(formatround(100*c(a1/(a1 + b1), a2/(a2 + b2)), 1), "\\%"),
+    OR = paste0(formatround(c(OR1, OR2), 1), " (",
+                formatround(c(OR1ci[1], OR2ci[1]), 1),
+                " to ",
+                formatround(c(OR1ci[2], OR2ci[2]), 1),
+                ")"),
+    z = formatround(c(z1, z2), 2),
+    Decision = c("Continue", "Stop (efficacy)"),
+    BF = paste0("1/", round(1/c(bf1, bf2), 1))
+)
+
+restablex <- xtable::xtable(restable)
+colnames(restablex) <- c("Analysis", "$n_0$", "$n_1$", "$\\hat{\\pi}_0$",
+                         "$\\hat{\\pi}_1$",
+                         "$\\widehat{\\mathrm{OR}}$ (95\\% CI)", "$z$",
+                         "Decision",
+                         "$\\mathrm{BF}_{01}$")
+print(restablex, floating = FALSE, include.rownames = FALSE,
+      booktabs = TRUE,
+      sanitize.text.function = function(x){x})
+@
+\end{table}
+
+Assuming a normal likelihood for the estimated log odds ratio $\hat{\theta} =
+\log \widehat{\mathrm{OR}}$ and using the hypotheses specified by the trial
+investigators, we can compute the Bayes factor from Table~\ref{tab:BFcritical}
+contrasting $H_0 \colon \theta = 0$ to $H_1 \colon \theta = \log(\Sexpr{ORH1}) =
+\Sexpr{round(log(ORH1), 2)}$. This leads to a Bayes factor $\mathrm{BF}_{01}^1 =
+1/\Sexpr{round(1/bf1, 1)}$ in the first analysis and $\mathrm{BF}_{01}^2 =
+1/\Sexpr{round(1/bf2, 1)}$ in the second. Had we used a threshold of $k_1 =
+1/10$, the study would have thus been stopped for $H_1$ after the second
+analysis, resulting in the same decision as was made by the trial investigators
+based on a classical group sequential design.
+
+Suppose the trial has not been carried out and we want to plan it using a
+sequential Bayes factor design. Assuming allocation of $n$ patients to the
+control and $n$ patients to the treatment group, the approximate standard error
+of the estimated log odds ratio $\hat{\theta}$ is $\sigma = \sqrt{1/\{n \pi_0 (1
+  - \pi_0)\} + 1/\{n \pi_1 (1 - \pi_1)\}}$, see Appendix~\ref{app:selogOR}.
+Thus, assuming a canonical distribution for $z = \hat{\theta}/\sigma$ with
+information level $I = 1/\sigma^2$, we can apply the results from
+Section~\ref{sec:zstatistic} to compute sequential Bayes factor design
+characteristics.
+
+\begin{figure}[!htb]
+<< "low-PV-design-plot", fig.height = 3.5 >>=
+pH1lab <- paste0("'Stop for' ~ italic(H[1]) ~ '(BF'['01'] <= 1/", 1/k1, " * ')'")
+pH0lab <- paste0("'Stop for' ~ italic(H[0]) ~ '(BF'['01'] >= ", k0, " * ')'")
+pInclab <- "'Inconclusive'"
+cols <- c(2, 1, 4)
+names(cols) <- c(pH0lab, pInclab, pH1lab)
+dfh1 <- data.frame(plot(bfdesignH1, nullplot = FALSE, plot = FALSE)$pDF1,
+                   dp = "H1")
+dfh0 <- data.frame(plot(bfdesignH0, nullplot = FALSE, plot = FALSE)$pDF1,
+                   dp = "H0")
+
+H0lab <- "'under' ~ italic(H[0]) * ':' ~ theta == 0"
+H1lab <- paste0("'under' ~ italic(H[1]) * ':' ~ theta == ", round(pm, 2))
+plotdf <- rbind(dfh1, dfh0) |>
+    tidyr::pivot_longer(cols = c("pH0", "pH1", "pInc"),
+                        names_to = "type",
+                        values_to = "probability") |>
+    dplyr::mutate(setting = factor(dp, levels = c("H1", "H0"),
+                                   labels = c(H1lab, H0lab)),
+                  type = dplyr::case_when(type == "pH1" ~ pH1lab,
+                                          type == "pH0" ~ pH0lab,
+                                          type == "pInc" ~ pInclab),
+                  type = factor(type, levels = c(pH1lab, pInclab, pH0lab)))
+ggplot(data = plotdf, aes(x = n, y = probability, color = type)) +
+    facet_wrap(~ setting, labeller = label_parsed) +
+    geom_line(alpha = 0.3) +
+    geom_point() +
+    scale_y_continuous(breaks = seq(0, 1, 0.2),
+                       labels = scales::percent, limits = c(0, 1)) +
+    scale_x_continuous(breaks = seq(25, 100, 25)) +
+    scale_color_manual(labels = scales::label_parse(),
+                       values = cols) +
+    labs(x = "Sample size (per group)", y = "Probability (by-analysis)", color = "") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "top",
+          strip.background = element_rect(fill = "white"))
+@
+\caption{Sequential Bayes factor probabilities for the Low-PV trial
+  \citep{Barbui2021}.}
+\label{fig:lowPVdesign}
+\end{figure}
+
+
+Figure~\ref{fig:lowPVdesign} shows the probability of obtaining conclusive
+evidence for $H_1$ (blue), $H_0$ (red), or to remain inconclusive (black) by
+each of the three analyses, assuming that data are generated under $H_1$
+($\theta = \log(\Sexpr{ORH1}) = \Sexpr{round(log(ORH1), 2)}$, left plot) or
+under $H_0$ ($\theta = 0$, right plot). Three equally-spaced analyses at 25, 50,
+and 75 patients per group are considered, as in the original trial. We can see
+that the probabilities of conclusive evidence for the corresponding true
+hypotheses are very similar under both hypotheses. Both surpass 80\% after the
+third analysis, but remain below 90\%. To achieve a probability of 90\%, the
+maximum sample size and/or the number of interim analyses must be further
+increased.
+
+<< "low-PV-design-sample-size" >>=
+## power function to use for root-finding maximum sample size
+powerfun. <- function(nmax, m, H = "H1") {
+    n <- seq(nmax/m, nmax, nmax/m)
+    if (H == "H1") {
+        se <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p1H1*(1 - p1H1)*n))
+        dpm <- pm
+    } else {
+        se <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p0H1*(1 - p0H1)*n))
+        dpm <- 0
+    }
+    res <- pbf01seq(k1 = k1, k0 = k0, se = se, n = n, pm = pm, psd = psd,
+                    dpm = dpm, dpsd = 0, type = "normal")
+    if (H == "H1") {
+        p <- res$cumpH1[m]
+    } else {
+        p <- res$cumpH0[m]
+    }
+    return(p)
+}
+powerfun <- Vectorize(FUN = powerfun.)
+
+## fix number of analyes and find maximum sample size to achieve target power
+m <- 3
+pow <- 0.9
+rootfun <- function(nmax, m, H) {
+    powerfun(nmax = nmax, m = m, H = H) - pow
+}
+nmax1 <- uniroot(f = rootfun, interval = c(10, 1000), m = m,
+                 H = "H1")$root
+nmax0 <- uniroot(f = rootfun, interval = c(10, 1000), m = m,
+                 H = "H0")$root
+@
+
+\begin{figure}[!htb]
+<< "low-PV-design-plot2", fig.height = 7.5 >>=
+lowPVdesign <- function(nmax = 75, m = 3) {
+    n <- seq(nmax/m, nmax, length.out = m)
+    se1 <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p1H1*(1 - p1H1)*n))
+    se0 <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p0H1*(1 - p0H1)*n))
+    bfdesignH1 <- bfpwr::pbf01seq(k1 = k1, k0 = k0, se = se1, n = n, pm = pm,
+                                  psd = psd, dpm = pm, dpsd = 0,
+                                  type = "normal")
+    bfdesignH0 <- bfpwr::pbf01seq(k1 = k1, k0 = k0, se = se0, n = n, pm = pm,
+                                  psd = psd, dpm = 0, dpsd = 0, type = "normal")
+    rbind(
+        data.frame(nmax = nmax, m = m,
+                   dp = "'under' ~ italic(H[0]) * ':' ~ theta == 0",
+                   EN = bfdesignH0$EN,
+                   SDN = sqrt(bfdesignH0$VarN),
+                   p = c(tail(bfdesignH0$cumpH0, n = 1),
+                         tail(bfdesignH0$cumpH1, n = 1)),
+                   type = c("'Pr(Correct evidence)'", "'Pr(Misleading evidence)'")),
+        data.frame(nmax = nmax, m = m,
+                   dp = paste0("'under' ~ italic(H[1]) * ':' ~ theta == ",
+                               round(pm, 2)),
+                   EN = bfdesignH1$EN,
+                   SDN = sqrt(bfdesignH1$VarN),
+                   p = c(tail(bfdesignH1$cumpH1, n = 1),
+                         tail(bfdesignH1$cumpH0, n = 1)),
+                   type = c("'Pr(Correct evidence)'", "'Pr(Misleading evidence)'"))
+          )
+}
+grid <- expand.grid(nmax = seq(50, 150, 5),
+                    m = seq(1, 10, 1))
+plotDF <- do.call("rbind", lapply(X = seq(1, nrow(grid)), FUN = function(i) {
+    lowPVdesign(nmax = grid$nmax[i], m = grid$m[i])
+}))
+
+probplot <- ggplot(plotDF,
+                   aes(x = nmax, y = p,
+                       color = factor(m, ordered = TRUE))) +
+    facet_grid(type ~ dp, scales = "free_y",
+               labeller = label_parsed, switch = "y") +
+    geom_line(alpha = 0.9) +
+    ## geom_point() +
+    scale_y_continuous(labels = scales::percent) +
+    ## expand_limits(y = 0) +
+    guides(color = guide_legend(nrow = 1)) +
+    labs(x = "Maximum sample size (per group)", y = "",
+         color = "Number of analyses") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "top",
+          axis.text.x = element_blank(),
+          axis.title.x.bottom = element_blank(),
+          axis.ticks.x.bottom = element_blank(),
+          strip.background.y = element_blank(),
+          strip.background.x = element_rect(fill = "white"),
+          strip.placement = "outside",
+          strip.text.y = element_text(size = 9))
+
+Nplotdf1 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
+    dplyr::mutate(yvar = EN, type = "'E(sample size)'")
+Nplotdf2 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
+    dplyr::mutate(yvar = SDN, type = "'SD(sample size)'")
+    ## dplyr::mutate(yvar = SDN/EN, type = "'COV(sample size)'")
+Nplotdf <- rbind(Nplotdf1, Nplotdf2)
+Nplot <- ggplot(Nplotdf,
+                aes(x = nmax, y = yvar, color = factor(m, ordered = TRUE))) +
+    facet_grid(type ~ dp, scales = "free_y",
+               labeller = label_parsed, switch = "y") +
+    geom_line(alpha = 0.9, show.legend = FALSE) +
+    labs(x = "Maximum sample size (per group)", y = "") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "top",
+          strip.background = element_blank(),
+          strip.text.x = element_text(colour = NA, margin = margin(t = 0, b = 0)),
+          strip.placement = "outside",
+          strip.text.y = element_text(size = 9))
+ggpubr::ggarrange(plotlist = list(probplot, Nplot), ncol = 1, align = "v",
+                  heights = c(1, 1))
+@
+\caption{Sequential Bayes factor design characteristics for the Low-PV trial
+  \citep{Barbui2021} for differing maximum sample sizes and number of analyses.}
+\label{fig:lowPVdesign2}
+\end{figure}
+
+Keeping the number of analyses fixed at three, we can use numerical root-finding
+to determine the maximum sample size size to achieve a probability of conclusive
+evidence of \Sexpr{round(100*pow, 1)}\%. This leads to $n_3 =
+\Sexpr{ceiling(nmax0)}$ under $H_0$ and $n_3 = \Sexpr{ceiling(nmax1)}$ under
+$H_1$. Thus taking the maximum of the two would ensure that the trial would
+produce conclusive evidence with high probability.
+
+Figure~\ref{fig:lowPVdesign2} shows design characteristics varying the maximum
+samples size and also the numbers of analyses. This includes also only one
+analysis which corresponds to a fixed design. Note that our approach can compute
+these design characteristics in a few seconds, whereas simulating all these
+designs would introduce Monte Carlo error and take substantially longer as for
+every combination a sequential trial has to be simulated many times. From the
+top plots, we can see that the probability of obtaining ``correct'' evidence
+(i.e., $\mathrm{BF}_{01} \leq 1/\Sexpr{1/k1}$, if $H_1$ is true and
+$\mathrm{BF}_{01} \geq \Sexpr{k0}$, if $H_0$ is true) increases with increasing
+maximum sample size (x axis). Increasing the number of analyses (color) also
+increases the probability of obtaining correct evidence for low maximum sample
+sizes. However, for maximum sample sizes higher than around 110, increasing the
+number of analyses actually decreases the probability of obtaining correct
+evidence. This is because a design with more analyses has also higher chances of
+producing misleading evidence and stopping for the wrong hypothesis
+(upper-middle plot).
+
+The probability of misleading evidence (i.e., $\mathrm{BF}_{01} \geq \Sexpr{k0}$
+if $H_1$ is true and $\mathrm{BF}_{01} \leq 1/\Sexpr{1/k1}$ if $H_0$ is true)
+first increases and then decreases again with increasing maximum sample size.
+Since $H_0$ and $H_1$ are point hypotheses, the probability of misleading
+evidence is bounded by $k = 1/10$, which is known as the ``universal bound''
+\citep{Royall1997}. However, across all choices of the number of analyses, the
+probability is much lower than the bound, remaining below 5\% across all maximum
+sample sizes and number of analysises, though bringing it below 2.5\% (the
+conventional type-I error rate for one-sided tests) requires substantial
+increases in the maximum sample size for designs with many analyses. Finally,
+increasing the number of analyses decreases the expected sample size
+(middle-bottom plot), while it has a non-monotone effect on the standard
+deviation of the sample size -- increasing for smaller maximum sample sizes and
+decreasing with larger maximum sample sizes. In sum,
+% %in the design of the Low-PV trial,
+compared to a fixed design, a sequential design with even only two analyses can
+drastically lower the expected sample size and increase the probability of
+correct evidence, while only slightly increasing the probability of misleading
+evidence.
+%% In practice, the challenge is to find a combination of maximum sample size
+%% and number of analyses that can be implemented and produces the desired
+%% probabilities of correct evidence and expected sample size.
+
+
+
+\subsection{Rat experiment on weight loss}
+\label{sec:rat}
+In animal research, just as in clinical trials, every additional observation
+carries significant ethical weight. Reducing sample size is hence of paramount
+interest, which is one pillar of the 3R (``Replace, Reduce, Refine'') principles
+in animal research \citep{RussellBurch1959}. We will now reanalyze data from a
+preclinical experiment with rats that was previously analyzed by
+\citet{Kang2025}. In this experiment, rats were randomly assigned to different
+dose levels of a candidate drug or to a control group to estimate the drug's
+effect on weight loss. The top plot of Figure~\ref{fig:ratdata} shows the
+measured weight loss values across groups. As can be seen, the low dose group
+(yellow) differs little from the control group (black), whereas the medium
+(blue) and high dose (blue) groups show substantially higher weight loss.
+
+\begin{figure}[!htb]
+<< "preclinical-data", fig.height = 5 >>=
+## library(metaDigitise)
+## ## click on "Control" as 1 and "Low" as 2
+## kangdat <- metaDigitise(dir = "kang-plots/", summary = FALSE)
+## kangdat <- res$`data-kangetal.png`
+## kangdat$weight_loss <- kangdat$y
+## kangdat$dose <- ifelse(kangdat$x < 1.5, "control",
+##                 ifelse(kangdat$x < 2.5, "low",
+##                 ifelse(kandat$x < 3.5, "medium", "high")))
+## dat <- kangdat[,c("dose", "weight_loss")]
+## write.csv(x = dat, file = "kangdat.csv", row.names = FALSE)
+
+## plot data
+kangdat <- read.csv("kangdat.csv")
+doselvls <- c("control", "low", "medium", "high")
+doselabs <- c("Control", "Low", "Medium", "High")
+doselabs2 <- c(paste0("Control (n = ", sum(kangdat$dose == "control"), ")"),
+               paste0("Low (n = ", sum(kangdat$dose == "low"), ")"),
+               paste0("Medium (n = ", sum(kangdat$dose == "medium"), ")"),
+               paste0("High (n = ", sum(kangdat$dose == "high"), ")"))
+kangdat$dosefac <- factor(kangdat$dose, levels = doselvls, labels = doselabs)
+kangdat$dosefac2 <- factor(kangdat$dose, levels = doselvls, labels = doselabs2)
+kangplot1 <- ggplot(kangdat, aes(x = dosefac2, y = weight_loss, fill = dosefac2)) +
+    geom_hline(yintercept = 0, lty = 2, alpha = 0.3) +
+    ggrain::geom_rain(show.legend = FALSE, alpha = 0.5,
+                      point.args = list(alpha = 1, pch = 1, size = 2,
+                                        show.legend = FALSE)) +
+    scale_fill_manual(values = palette.colors(n = length(doselvls))) +
+    labs(x = "Dose level", y = "Weight loss (grams)") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank())
+
+analyzekangdat <- function(control, treatment, pm, psd) {
+    nseq <- seq(2, pmax(length(control), length(treatment)), 1)
+    do.call("rbind", lapply(X = nseq, FUN = function(i) {
+        controli <- na.omit(control[1:i])
+        treatmenti <- na.omit(treatment[1:i])
+        esti <- mean(treatmenti) - mean(controli)
+        sei <- sqrt(var(treatmenti)/length(treatmenti) +
+                   var(controli)/length(controli))
+
+        ## calculate z-test BF
+        if (is.finite(sei)) {
+            ## bf01 <- bfpwr::dirbf01(estimate = esti, se = sei, null = 0, pm = pm,
+            ##                        psd = psd)
+            bf01 <- bfpwr::bf01(estimate = esti, se = sei, null = 0, pm = pm,
+                                psd = psd)
+        } else {
+            bf01 <- NaN
+        }
+
+        ## return results
+        data.frame(ncontrol = length(controli), ntreatment = length(treatmenti),
+                   MD = esti, MDse = sei, bf01 = bf01)
+    }))
+}
+
+## mean and standard deviation of normal prior assigned to mean difference
+pm <- 5
+psd <- 0
+
+## evidence thresholds
+k1 <- 1/10
+k0 <- 10
+
+set.seed(11)
+control <- sample(x = subset(kangdat, dose == "control")$weight_loss,
+                  replace = FALSE)
+treat <- list("Low" = sample(x = subset(kangdat, dose == "low")$weight_loss,
+                             replace = FALSE),
+              "Medium" = sample(x = subset(kangdat, dose == "medium")$weight_loss,
+                                replace = FALSE),
+              "High" = sample(x = subset(kangdat, dose == "high")$weight_loss,
+                              replace = FALSE))
+kanglist <- lapply(X = seq_along(treat), FUN = function(i) {
+    res <- analyzekangdat(control = control, treatment = treat[[i]], pm = pm,
+                          psd = psd)
+    decision <- "indecisive"
+    for (ni in seq(1, nrow(res))) {
+        ntreat <- res$ntreatment[ni]
+        ncontrol <- res$ncontrol[ni]
+        if (res$bf01[ni] > k0) {
+            decision <- "H0"
+            break
+        }
+        if (res$bf01[ni] < k1) {
+            decision <- "H1"
+            break
+        }
+    }
+    ## how many rats are saved?
+    ntreatsaved <- res$ntreatment[nrow(res)] - ntreat
+    ncontrolsaved <- res$ncontrol[nrow(res)] - ncontrol
+    list(df = data.frame(group = names(treat)[i], res),
+         decision = data.frame(group = names(treat)[i], decision = decision,
+                               ntreat = ntreat, ncontrol = ncontrol,
+                               ntreatsaved = ntreatsaved,
+                               ncontrolsaved = ncontrolsaved))
+})
+kangres <- do.call("rbind", lapply(X = kanglist, FUN = function(x) x$df))
+kangres$group <- factor(kangres$group, levels = c("Low", "Medium", "High"),
+                        ordered = TRUE)
+bfbks <- c(1/10^6, 1/10^5, 1/10^4, 1/10^3, 1/10^2, 1/10, 1, 10, 100)
+bflabs <- c("1/10^6", "1/10^5", "1/10^4", "1/10^3", "1/10^2", "1/10", "1", "10",
+            "10^2")
+kangplot2 <- ggplot(data = kangres,
+                    aes(x = ncontrol + ntreatment, y = bf01, color = group)) +
+    geom_hline(yintercept = 1, alpha = 0.5, lty = 2) +
+    geom_line() +
+    geom_point() +
+    scale_y_log10(breaks = bfbks, labels = parse(text = bflabs)) +
+    expand_limits(y = 100) +
+    scale_x_continuous(breaks = seq(4, max(kangres$ncontrol + kangres$ntreatment), 2)) +
+    labs(x = "Total sample size (control and treatment)",
+         y = bquote("BF"["01"])) +
+    guides(color = "none") +
+    scale_color_manual(values = palette.colors(n = length(doselvls))[-1]) +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank())
+ggpubr::ggarrange(plotlist = list(kangplot1, kangplot2), ncol = 1, align = "hv")
+
+## how many rats are saved? (not double-counting control rats as they contribute to all comparisons)
+ratssaved <- do.call("rbind", lapply(X = kanglist, FUN = function(x) x$decision)) |>
+    summarise(treatsaved = sum(ntreatsaved),
+              controlsaved = min(ncontrolsaved),
+              totalsaved = sum(ntreatsaved) + min(ncontrolsaved))
+@
+\caption{Weight loss in rats assigned to different levels of candidate drug
+  \citep{Kang2025} (top plot). The bottom plot shows a sequential Bayes factor
+  analysis contrasting the null hypothesis of no mean difference ($H_0 \colon
+  \theta_i = 0$) to a mean difference of 5 grams ($H_0 \colon \theta_i =
+  \Sexpr{pm}$) for each treatment group $i \in
+  \{\text{low},~\text{medium},~\text{high}\}$ indicated by the color. At each
+  step an observation from control and treatment group is added until the
+  maximum group size is reached.}
+\label{fig:ratdata}
+\end{figure}
+
+In the analysis of \citet{Kang2025}, the effects of interest were the mean
+differences in weight loss between the treatment groups and the control group,
+denoted by $\theta_i$ with $i \in \{\text{low},~\text{medium},~\text{high}\}$.
+The investigators defined a mean difference of at least 5 grams as effective,
+which we will now use to specify the alternative hypothesis. The Bayes factor
+contrasting $H_0 \colon \theta_i = 0$ to $H_1 \colon \theta_i = 5$ is shown in
+the bottom plot of Figure~\ref{fig:ratdata} for each treatment group (color). An
+observation from each group is added at each step until the maximum group size
+is reached. Note that the order in which the data were collected is unknown,
+which is why a random permutation is shown here. Appendix~\ref{app:rats} shows
+that also for other permutations of the data, similar results are obtained. As
+the sample size increases, the Bayes factor in the low dose group (yellow)
+increases and reaches $\mathrm{BF}_{01} > 10$ after 10 rats, suggesting strong
+evidence for the absence of an effect over its presence. In contrast, the Bayes
+factors in the medium (blue) and high (green) dose groups decrease with
+increasing sample size, surpassing the threshold for strong evidence of
+$\mathrm{BF}_{01} < 1/10$ after 12 and 8 rats, respectively. Thus, if the
+experiment had been conducted using this sequential Bayes factor design,
+\Sexpr{ratssaved$controlsaved} rats from the control group and
+\Sexpr{ratssaved$treatsaved} rats from the treatment groups could have been
+saved, totalling to \Sexpr{ratssaved$totalsaved} saved rats.
+
+
+
+\begin{figure}[!htb]
+<< "kang-design", fig.height = 3.5 >>=
+k1 <- 1/10
+k0 <- 10
+designkangdat <- function(control, treatment, pm, psd, setting) {
+    nseq <- seq(2, 30, 2)
+    MD <- mean(treatment) - mean(control)
+    MDse <- sqrt(var(treatment)/(length(treatment)/2) +
+                 var(control)/(length(control)/2))
+    seseq <- sqrt(var(treatment)/(nseq/2) + var(control)/(nseq/2))
+    res <- pbf01seq(k1 = k1, k0 = k0, se = seseq, n = nseq, pm = pm, psd = psd,
+                    dpm = MD, dpsd = MDse, type = "normal")
+    plotdf <- plot(res, plot = FALSE)
+    rbind(data.frame(plotdf$pDF1, H = "Effect from data", setting = setting,
+                     MD = MD, MDse = MDse),
+          data.frame(plotdf$pDF2, H = "No effect", setting = setting, MD = 0,
+                     MDse = 0))
+}
+treat2 <- treat
+kangdesignres <- do.call("rbind", lapply(X = seq_along(treat2), FUN = function(i) {
+    designkangdat(control = control, treatment = treat2[[i]], pm = pm, psd = psd,
+                  setting = names(treat2)[i])
+}))
+
+pH1lab <- paste0("'Stop for' ~ italic(H[1]) ~ '(BF'['01'] <= 1/", 1/k1, " * ')'")
+pH0lab <- paste0("'Stop for' ~ italic(H[0]) ~ '(BF'['01'] >= ", k0, " * ')'")
+pInclab <- "'Inconclusive'"
+cols <- c(2, 1, 4)
+names(cols) <- c(pH0lab, pInclab, pH1lab)
+kangdesignreslong <- kangdesignres |>
+    tidyr::pivot_longer(cols = c("pH0", "pH1", "pInc"),
+                        names_to = "type",
+                        values_to = "probability") |>
+    dplyr::mutate(setting = factor(setting, levels = c("Low", "Medium", "High")),
+                  type = dplyr::case_when(type == "pH1" ~ pH1lab,
+                                          type == "pH0" ~ pH0lab,
+                                          type == "pInc" ~ pInclab),
+                  type = factor(type, levels = c(pH1lab, pInclab, pH0lab)))
+
+ggplot(subset(kangdesignreslong, MD != 0),
+       aes(x = n, y = probability, color = type)) +
+    ## facet_grid(H ~ setting) +
+    facet_wrap(~ setting + MD + MDse,
+               labeller = label_bquote(.(as.character(setting)) ~
+                                           "dose:" ~
+                                           theta %~% "N(" * .(round(MD, 1)) *
+                                            "," ~ .(round(MDse, 1))^2 *
+                                                ")")) +
+    geom_line(alpha = 0.3) +
+    geom_point() +
+    scale_y_continuous(breaks = seq(0, 1, 0.2),
+                       labels = scales::percent, limits = c(0, 1)) +
+    scale_color_manual(values = cols, labels = scales::label_parse()) +
+    labs(x = "Total sample size (control and treatment)",
+         y = "Probability (by-analysis)", color = "") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "top",
+          strip.background = element_rect(fill = "white"))
+@
+\caption{Sequential Bayes factor probabilities for replications of weight loss
+  rat experiments \citep{Kang2025}. Probabilities are computed assuming a design
+  prior corresponding to posterior distributions for the mean difference
+  $\theta$ based on data from the original experiments (indicated in the plot
+  panels). Analyses are assumed to be conducted after each pair of rats from
+  control and treatment groups.}
+\label{fig:designrat}
+\end{figure}
+
+Suppose that before moving on to trials with human participants, we want to
+replicate these findings in independent experiments -- a practice which is
+generally recommended in preclinical studies to rule out false positives
+\citep{Piper2019, Drude2021}. In the Bayesian design of a replication study, it
+is natural to use a design prior based on data from the original study to plan
+the replication \citep{MicheloudHeld2022, Anderson2022, Pawel_etal2023}.
+Figure~\ref{fig:designrat} shows stopping probabilities for replication study
+designs in which an analysis is performed after each pair of rats from the
+control and treatment groups. These designs assume a normal design prior
+distribution for the mean difference $\theta$, centered around the estimated
+mean difference from the original experiment, with a standard deviation equal to
+the standard error of the estimate (plot panels). Such a design prior can be
+motivated as the posterior distribution of the mean difference based on the
+original data and a flat prior. Note that if we would also use this design prior
+as the analysis prior (instead of the point hypothesis $H_1 \colon \theta =
+\Sexpr{pm}$), a ``replication Bayes factor'' \citep{VerhagenWagenmakers2014,
+  Ly_etal2018, PawelHeld2022} would be obtained. However, here we will only
+consider testing the same alternative hypotheses as in the original study.
+
+For the medium and high dose groups, the probabilities of finding strong
+evidence for the alternative over the null hypothesis ($\mathrm{BF}_{01} \leq
+1/\Sexpr{1/k1}$, blue curve) quickly increase with increasing sample size. They
+reach 80\% after a sample size of 10 in both cases. In contrast, for the low
+dose group, the probability of finding strong evidence for the null over the
+alternative hypothesis ($\mathrm{BF}_{01} \geq \Sexpr{k0}$, red curve) increases
+more slowly, requiring nearly 30 rats to reach 80\%. While the probability of
+misleading evidence remains nearly 0\% for the medium and high dose groups (red
+curves), it increases considerably for the low dose group (up to almost 10\%,
+blue curve) since the design prior based on the original data does not fully
+rule out positive effects in the neighborhood of the alternative hypothesis
+($H_1 \colon \theta = \Sexpr{pm}$).
+
+In sum, the developed sequential Bayes factor design method enables rapid
+calculation of key design characteristics while accounting for parameter
+uncertainty. This can potentially lead to more efficient designs. For instance,
+rather than allocating an equal number of rats to all groups, one could allocate
+fewer rats to the medium and high dose groups and more rats to the low dose
+group, thereby ensuring a high probability of informative inferences across all
+groups.
+
+
+\section{The sequential Bayesian \textit{t}-test}
+\label{sec:ttest}
+
+The Bayes factor version of the \textit{t}-test is a popular approach for
+sequential hypothesis testing in the social sciences. Assuming normally
+distributed data with unknown variance, \citet{Gronau2020} proposed an
+``informed'' \textit{t}-test Bayes factor that can take prior information into
+account through informative prior distributions. The Bayes factor is
+\begin{align}
+  \mathrm{BF}_{01} = \frac{\mathrm{T}_{\nu}(t \mid 0, 1)_{(-\infty,+\infty)}}{\int_{-\infty}^{+\infty}
+  \mathrm{NCT}_{\nu}(t \mid \theta \sqrt{n}) \, \mathrm{T}_{\kappa}(\theta \mid \mu, \tau)_{[a,b]}
+  \, \mathrm{d}\theta}
+  \label{eq:tBF}
+\end{align}
+where $t$ is the observed $t$-statistic, $n$ is the effective sample size (the
+actual number of observations/pairs for one-sample/paired $t$-tests, or the
+harmonic sum of the group sizes for the two-sample $t$-tests), and
+$\mathrm{T}_{\nu}(\cdot \mid \mu, \tau)_{[a,b]}$ is the density of the
+location-scale $t$ distribution with location $\mu$, scale $\tau$, and
+corresponding degrees of freedom $\nu$, truncated to the interval $[a, b]$.
+$\mathrm{NCT}_{\nu}(\cdot \mid \lambda)$ is the density of the non-central $t$
+distribution with non-centrality parameter $\lambda$. When the hyperparameters
+are set to $\kappa = 1$, $\mu = 0$, $a = -\infty$, $b=+\infty$, the prior
+becomes a Cauchy distribution, and the Bayes factor reduces to the widely used
+``Jeffreys-Zellner-Siow'' (JZS) Bayes factor \citep{Jeffreys1939, Zellner1980}.
+The JZS Bayes factor is typically used with a default scale of $\tau =
+1/\sqrt{2}$, as e.g., implemented in the \texttt{BayesFactor} R package
+\citep{Rouder2009}.
+
+Design calculations for the sequential Bayes factor \textit{t}-test can also be
+embedded in the proposed \textit{z}-statistic framework. The Bayes
+factor~\eqref{eq:tBF} is not available in closed-form but requires
+one-dimensional numerical integration. Therefore, the critical \textit{t}-value
+such that $\mathrm{BF}_{01} = k$ must be determined numerically, as demonstrated
+by \citet{Pawel2025} and \citet{Wong2025} for fixed designs. Assuming that the
+effective sample size is large enough (e.g., $n \geq 30$), the \textit{t}
+distribution can be approximated by a normal distribution. Specifically, for
+large enough $n$, we have that $t \mid \theta \sim \mathrm{N}(\theta \sqrt{n},
+1)$ where $\theta$ is the standardized mean (difference). Therefore, the vector
+of accumulating \textit{t}-statistics approximately follows the canonical
+distribution from Section~\ref{sec:canonical} with information level $I_i = n_i$
+at analysis $i$, enabling the computation of stopping probabilities and other
+design characteristics via numerical multivariate normal integration.
+
+
+<< "schoenbrodt-wagenmakers-example" >>=
+## sample size and number of looks
+nmin <- 40
+nmax <- 100
+step <- 1
+n <- seq(nmin, nmax, step)
+type <- "two.sample"
+
+## one-sided JZS analysis prior
+plocation <- 0
+pscale <- 1/sqrt(2)
+pdf <- 1
+alternative <- "greater"
+
+## design prior
+dpm <- 0.5
+dpsd <- 0.1
+
+## BF thresholds
+k0 <- 6
+k1 <- 1/30
+
+startbfpwr <- Sys.time()
+res1 <- ptbf01seq(k1 = k1, k0 = k0, n = n, plocation = plocation,
+                  pscale = pscale, pdf = pdf, dpm = dpm, dpsd = dpsd,
+                  type = type, alternative = alternative)
+res0 <- ptbf01seq(k1 = k1, k0 = k0, n = n, plocation = plocation,
+                  pscale = pscale, pdf = pdf, dpm = 0, dpsd = 0, type = type,
+                  alternative = alternative)
+endbfpwr <- Sys.time()
+timebfpwr <- difftime(endbfpwr, startbfpwr, units = "secs")
+
+## startBFDA <- Sys.time()
+## ## remotes::install_github("nicebread/BFDA", subdir = "package")
+## library(BFDA)
+## nMC <- 1000
+## BFDAsim <- BFDA.sim(expected.ES = rnorm(n = nMC, mean = dpm, sd = dpsd),
+##                     type = "t.between",
+##                     alternative = alternative,
+##                     prior = list("Cauchy",
+##                                  list(prior.location = plocation,
+##                                       prior.scale = pscale)),
+##                     design = "sequential", stepsize = step, n.min = nmin,
+##                     n.max = nmax, B = nMC, seed = 42, cores = 10)
+## plot(BFDAsim, boundary = c(1/k1, 1/k0), n.trajectories = 60)
+## BFDA.analyze(BFDAsim, design = "sequential", n.min = nmin, n.max = nmax,
+##              boundary = c(1/k1, 1/k0))
+## BFDAsim0 <- BFDA.sim(expected.ES = 0, type = "t.between",
+##                      alternative = alternative,
+##                      prior = list("Cauchy",
+##                                  list(prior.location = plocation,
+##                                       prior.scale = pscale)),
+##                      design = "sequential", stepsize = step, n.min = nmin,
+##                      n.max = nmax, B = nMC, seed = 43, cores = 10)
+## plot(BFDAsim0, boundary = c(1/k1, 1/k0), n.trajectories = 60)
+## BFDA.analyze(BFDAsim0, design = "sequential", n.min = nmin, n.max = nmax,
+##              boundary = c(1/k1, 1/k0))
+## endBFDA <- Sys.time()
+## timeBFDA <- difftime(endBFDA, startBFDA, units = "mins")
+@
+
+\citet{Schoenbrodt2018} describe an application of the \textit{t}-test Bayes
+factor to sequential experiments in psychology. They consider an extreme design
+involving \Sexpr{length(n)} analyses, in which an analysis is performed after
+every additional pair of participants in treatment and control groups until the
+maximum sample size $n_{\Sexpr{length(n)}} = \Sexpr{nmax}$ is reached or the
+experiment stopped before. They set the asymmetric Bayes factor thresholds $k_0
+= \Sexpr{k0}$ and $k_1 = 1/\Sexpr{1/k1}$ and specify a normal design prior for
+the standardized mean difference $\theta \sim \mathrm{N}(\Sexpr{dpm},
+\Sexpr{dpsd}^2)$ to account for parameter uncertainty. Finally, for the analysis
+they assume a default JZS Bayes factor with scale $\tau = 1/\sqrt{2}$ truncated
+to positive standardized mean differences ($a = 0$, $b=+\infty$).
+
+\begin{figure}[!htb]
+<< "schoenbrodt-wagenmakers-example-figure" >>=
+plotres <- plot(res1, plot = FALSE)
+H0lab <- "'under' ~ theta == 0"
+H1lab <- paste0("'under' ~ theta %~% 'N(", round(dpm, 2), ", ", round(dpsd, 2), "'^2 * ')'")
+pH1lab <- paste0("'Stop for' ~ italic(H[1]) ~ '(BF'['01'] <= 1/", 1/k1, " * ')'")
+pH0lab <- paste0("'Stop for' ~ italic(H[0]) ~ '(BF'['01'] >= ", k0, " * ')'")
+pInclab <- "'Inconclusive'"
+cols <- c(2, 1, 4)
+names(cols) <- c(pH0lab, pInclab, pH1lab)
+plotdf <- rbind(data.frame(plotres$pDF1, dp = H1lab),
+                data.frame(plotres$pDF2, dp = H0lab)) |>
+    tidyr::pivot_longer(cols = c("pH0", "pH1", "pInc"),
+                        names_to = "type",
+                        values_to = "probability") |>
+    dplyr::mutate(type = dplyr::case_when(type == "pH1" ~ pH1lab,
+                                          type == "pH0" ~ pH0lab,
+                                          type == "pInc" ~ pInclab),
+                  type = factor(type, levels = c(pH1lab, pInclab, pH0lab)))
+
+ggplot(data = plotdf, aes(x = n, y = probability, color = type)) +
+    facet_wrap(~ dp, ncol = 2,
+               labeller = label_parsed) +
+    geom_line(alpha = 0.3) +
+    geom_point(size = 0.5) +
+    labs(x = "Sample size (per group)", y = "Probability (by-analysis)", color = "") +
+    scale_y_continuous(breaks = seq(0, 1, 0.2),
+                       labels = scales::percent, limits = c(0, 1)) +
+    scale_color_manual(values = cols, labels = scales::label_parse()) +
+    guides(color = guide_legend(override.aes = list(size = 1))) +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          legend.position = "top",
+          strip.background = element_rect(fill = "white"))
+@
+\caption{Sequential Bayes factor design probabilities based on \textit{t}-test
+  Bayes factor for design from \citet{Schoenbrodt2018}.}
+\label{fig:ttest}
+\end{figure}
+
+Figure~\ref{fig:ttest} shows the stopping probabilities for the design from
+\citet{Schoenbrodt2018}. Despite the many interim analyses, the calculations
+took only a few seconds, whereas simulation-based calculations using the
+\texttt{BFDA} package took around 20 minutes on the same computer. Under the
+specified normal design prior (left plot), we obtain the stopping probabilities
+for $H_1$ and $H_0$ as \Sexpr{round(100*tail(res1$cumpH1, n = 1), 1)}\% and
+\Sexpr{round(100*tail(res1$cumpH0, n = 1), 1)}\%, respectively, as well as an
+average sample size of \Sexpr{round(res1$EN1, 1)}. These are very close to the
+70.6\%, 1.6\%, and 69 reported by \citet{Schoenbrodt2018}, which were estimated
+with simulation. Similarly, assuming no effect ($\theta = 0$, right plot), we
+obtain \Sexpr{round(100*tail(res0$cumpH1, n = 1), 1)}\% to stop for $H_1$,
+\Sexpr{round(100*tail(res0$cumpH0, n = 1), 1)}\% to stop for $H_0$ , and an
+average sample size of \Sexpr{round(res0$EN1, 1)}, which are again very close to
+the 0.6\%, 70.9\%, and 66 reported by \citet{Schoenbrodt2018}. In sum, the
+\textit{z}-statistic perspective enables quick and accurate calculation of key
+design characteristics of sequential designs based on the Bayes factor
+\textit{t}-test, one of the most important sequential Bayes factor tests used in
+practice.
+
+
+\section{Discussion}
+\label{sec:discussion}
+
+Bayes factors offer an intuitive framework for sequential data analysis: Data
+can be analyzed repeatedly without concerns about multiplicity, and stopping
+decisions are naturally linked to interpretable updates of prior beliefs.
+Despite these advantages, the broader adoption of sequential Bayes factor
+designs has been limited, perhaps because of the difficulty of computing their
+design characteristics. Existing approaches typically rely on extensive
+simulation, which can be computationally costly, sensitive to Monte Carlo error,
+and inconvenient when exploring many design options.
+
+In this paper, we introduced a general approach that overcomes these limitations
+by expressing Bayes factors as functions of \textit{z}-statistics and and
+extending results from classical group sequential design theory. This
+perspective showed that Bayes factor stopping rules correspond to sets of
+hyper-rectangles regions in the space of accumulating \textit{z}-statistics.
+Under the canonical \textit{z}-statistic distribution, these regions can be
+integrated efficiently using multivariate normal probabilities, eliminating the
+need for simulation. The resulting computations are fast, accurate, and scalable
+to designs with many interim looks. The approach also naturally incorporates
+design priors, enabling experiments to account for parameter uncertainty in the
+design. Traditional fixed parameter calculations are a special case, thus
+enabling flexible exploration of both Bayesian and frequentist operating
+characteristics within a unified framework.
+
+There are, however, some limitations. The method requires that the Bayes factor
+can be expressed as a function of the \textit{z}-statistic and that the
+accumulating \textit{z}-statistics follow, at least approximately, a canonical
+multivariate normal distribution. Situations where these assumptions are not met
+(e.g., binary data with small sample size and/or extreme probabilities) may
+still require simulation or other numerical methods for computing design
+characteristics. Developing modifications for these situations could be one
+avenue for future research. Furthermore, while multivariate normal integration
+is highly efficient for realistic numbers of interim analyses, extremely large
+numbers of looks remain computationally challenging. Nevertheless, such designs
+are logistically challenging and rarely used in practice. For example, the most
+common number of interim analyses in clinical trials is only one or two, if any
+\citep{Stevely2015}.
+
+To conclude, many sequential Bayes factor designs can be planned as rapidly and
+reliably as classical group sequential designs. Our accompanying R package
+\texttt{bfpwr} implements these methods and offers experimenters a practical
+tool for designing efficient and informative studies.
+
+\section*{Acknowledgments}
+We thank Wong Tsz Keung, Riko Kelter, and František Bartoš for valuable comments
+on drafts of the manuscript. We thank Torsten Hothorn for help with calculating
+multivariate normal probabilities with \texttt{mvtnorm::lpmvnorm}. We thank Tony
+Pourmohamad for pointing us to the data from the rat experiment. The
+acknowledgment of these individuals does not imply their endorsement of the
+paper.
+
+\section*{Conflict of interest}
+We declare no conflict of interest.
+
+\section*{Software and data}
+Data from the Low-PV trial were extracted from Table S5 in the supplement of
+\citet{Barbui2021}. Data from the weight loss rat experiment were extracted from
+Figure~ 4 in \citet{Kang2025}. Code and data to reproduce our analyses are
+openly available at \url{https://github.com/SamCH93/XXX}. A snapshot of the
+repository at the time of writing is available at
+\url{https://doi.org/10.5281/zenodo.XXXXXX}. We used the statistical programming
+language \Sexpr{R.Version()[["version.string"]]} for analyses \citep{R} along
+with the \texttt{ggplot2} \citep{Wickham2016}, \texttt{dplyr}
+\citep{Wickham2023}, \texttt{mvtnorm} \citep{Genz2009}, \texttt{ggpubr}
+\citep{Kassambara2023}, \texttt{ggrain} \citep{Allen2021}, \texttt{xtable}
+\citep{Dahl2019}, \texttt{rpact} \citep{WassmerBrannath:2016}, and
+\texttt{knitr} \citep{Xie2015} packages.
+
+\onehalfspacing % Reset line spacing to 1.5 from here on
+{\small
+\bibliographystyle{abbrvnat}
+\bibliography{bibliography}
+}
+
+\begin{appendices}
+
+\section{The R package bfpwr}
+\label{app:package}
+
+The following code excerpt shows how the \texttt{bfpwr} R package can be used to
+compute design characteristics of a sequential JZS (\textit{t}-test) Bayes
+factor design.
+
+\begin{spacing}{1}
+<< "appendix-package", fig.height = 6, echo = TRUE, size = "small" >>=
+## group sequential design features not in CRAN version yet
+remotes::install_github(repo = "SamCH93/bfpwr", subdir = "package", ref = "gsd")
+library(bfpwr) # load package
+## set up sequential t-test Bayes factor design
+design <- ptbf01seq(
+    k1 = 1/10, # Bayes factor threshold for H1
+    k0 = 6, # Bayes factor threshold for H0
+    type = "two.sample", # two-sample t-test
+    n = seq(20, 100, 20), # per-group sample sizes at analyses
+    ## specify one-sided Jeffreys-Zellner-Siow analysis prior
+    plocation = 0, pscale = 1/sqrt(2), pdf = 1, alternative = "greater",
+    ## specify normal design prior around SMD = 0.5 with small stand. deviation
+    dpm = 0.5, dpsd = 0.05
+)
+design # print design summary
+plot(design) # plot design under design prior (top) and under H0 (bottom)
+@
+\end{spacing}
+
+\section{Marginal distribution of the \textit{z}-statistics}
+\label{app:zmarginal}
+The \textit{z}-statistic vector can be represented as $\boldsymbol{Z} \mid \theta
+= \theta \boldsymbol{I} + \boldsymbol{\epsilon}$ with $\boldsymbol{\epsilon}
+\sim \mathrm{N}_m(\boldsymbol{0}, \boldsymbol{\Sigma})$ and independent of
+$\theta$. Since $\boldsymbol{I}$ is fixed and also $\theta \sim
+\mathrm{N}(\mu_d, \tau^2_d)$, the marginal distribution of $\boldsymbol{Z}$ is
+also normal. By the law of total expectation, its expectation is
+\begin{align*}
+  \mathrm{E}(\boldsymbol{Z})
+  &= \mathrm{E}\{\mathrm{E}(\boldsymbol{Z} \mid \theta)\} \\
+  &= \mathrm{E}(\theta \boldsymbol{I}) \\
+  &= \mathrm{E}(\theta)  \boldsymbol{I} \\
+  &= \mu_d  \boldsymbol{I}.
+\end{align*}
+Similarly, applying the law of total covariance, its covariance is
+\begin{align*}
+  \mathrm{Cov}(\boldsymbol{Z})
+  &= \mathrm{E}\{\mathrm{Cov}(\boldsymbol{Z} \mid \theta)\} + \mathrm{Cov}\{\mathrm{E}(\boldsymbol{Z} \mid \theta)\} \\
+  &= \mathrm{E}(\boldsymbol{\Sigma}) + \mathrm{Cov}(\theta \boldsymbol{I}) \\
+  &= \boldsymbol{\Sigma} + \boldsymbol{I} \, \mathrm{Cov}(\theta) \boldsymbol{I}^\top \\
+  &= \boldsymbol{\Sigma} + \tau^2_d \boldsymbol{I} \boldsymbol{I}^\top. \\
+\end{align*}
+
+\section{Standard error of the log odds ratio}
+\label{app:selogOR}
+Assuming two independent binomial random variables $Y_0 \sim \mathrm{Bin}(n_0,
+\pi_0)$ and $Y_1 \sim \mathrm{Bin}(n_1, \pi_1)$, the variances of the estimated
+success rates $\hat{\pi}_0 = y_0/n_0$ and $\hat{\pi}_1 = y_1/n_1$ are
+$\mathrm{Var}(\hat{\pi}_i) = \{\pi_i (1 - \pi_i)\}/n_i$ for $i \in \{0, 1\}$.
+Using the delta method, the approximate variances of the estimated log odds
+$\hat{\psi}_i = \log \{\hat{\pi}_i/(1 - \hat{\pi}_i)\}$ can be obtained by
+\begin{align*}
+  \mathrm{Var}(\hat{\psi}_i)
+  &= \mathrm{Var}(\hat{\pi}_i) \times \left[\frac{\mathrm{d}
+    \log \{\pi_i/(1 - \pi_i)\}}{\mathrm{d} \pi_i}\right]^2 \\
+  &= \frac{\pi_i (1 - \pi_i)}{n_i} \times \frac{1}{\pi_i^2 (1 - \pi_i)^2} \\
+  &= \frac{1}{n_i \pi_i (1 - \pi_i)}
+\end{align*}
+for $i \in \{0, 1\}$. The approximate variance of the estimated log odds ratio
+$\hat{\theta} = \hat{\psi}_1 - \hat{\psi}_0$ is hence by independence
+\begin{align*}
+  \mathrm{Var}(\hat{\theta})
+  &= \mathrm{Var}(\hat{\pi}_1) + \mathrm{Var}(\hat{\pi}_0) \\
+  &= \frac{1}{n_1 \pi_1 (1 - \pi_1)} + \frac{1}{n_0 \pi_0 (1 - \pi_0)}.
+\end{align*}
+Taking the square root produces the approximate standard error of $\hat{\theta}$.
+
+\section{Sensitivity analysis for rat experiment}
+\label{app:rats}
+Figure~\ref{fig:ratspermute} and Table~\ref{tab:kangpermute} show results from
+sensitivity analyses regarding the random permutation of the data set from
+\citet{Kang2025}, for which the original collection order is unknown. The
+\Sexpr{ratssaved$totalsaved} rats saved reported in Section~\ref{sec:rat} are
+representative, or even a conservative estimate compared to the the permutation
+distribution in Figure~\ref{fig:ratspermute}.
+\begin{figure}[!htb]
+<< "kang-additional-plot", fig.height = 3 >>=
+set.seed(42)
+nsim <- 1000
+k1 <- 1/10
+k0 <- 10
+kangsimres <- do.call("rbind", lapply(X = seq(1, nsim), FUN = function(j) {
+    ## permute data order
+    control <- sample(x = subset(kangdat, dose == "control")$weight_loss,
+                      replace = FALSE)
+    treat <- list("Low" = sample(x = subset(kangdat, dose == "low")$weight_loss,
+                                 replace = FALSE),
+                  "Medium" = sample(x = subset(kangdat, dose == "medium")$weight_loss,
+                                    replace = FALSE),
+                  "High" = sample(x = subset(kangdat, dose == "high")$weight_loss,
+                                  replace = FALSE))
+    ## compute sequential BFs
+    do.call("rbind", lapply(X = seq_along(treat), FUN = function(i) {
+        res <- analyzekangdat(control = control, treatment = treat[[i]],
+                              pm = pm, psd = psd)
+        decision <- "indecisive"
+        for (ni in seq(1, nrow(res))) {
+            ntreat <- res$ntreatment[ni]
+            ncontrol <- res$ncontrol[ni]
+            if (res$bf01[ni] > k0) {
+                decision <- "H0"
+                break
+            }
+            if (res$bf01[ni] < k1) {
+                decision <- "H1"
+                break
+            }
+        }
+        ntreatsaved <- res$ntreatment[nrow(res)] - ntreat
+        ncontrolsaved <- res$ncontrol[nrow(res)] - ncontrol
+        data.frame(simulation = j, group = names(treat)[i], decision = decision,
+                   ntreat = ntreat, ncontrol = ncontrol,
+                   ntreatsaved = ntreatsaved, ncontrolsaved = ncontrolsaved)
+    }))
+}))
+
+kangsimsummaries <- kangsimres |>
+    group_by(simulation) |>
+    summarise(ntreatsaved = sum(ntreatsaved),
+              ncontrolsaved = min(ncontrolsaved)) |>
+    mutate(nsavedtotal = ntreatsaved + ncontrolsaved)
+
+ggplot(data = kangsimsummaries, aes(x = nsavedtotal)) +
+    geom_bar(color = 1, fill = "lightgrey", width = 0.5) +
+    scale_x_continuous(breaks = seq(0, 50, 1)) +
+    labs(x = "Number of rats saved", y = "Count") +
+    theme_bw() +
+    theme(panel.grid.minor = element_blank(),
+          panel.grid.major.x = element_blank(),
+          legend.position = "top",
+          strip.background = element_rect(fill = "white"))
+@
+\caption{Number of rats saved across \Sexpr{prettyNum(nsim, big.mark = "'")}
+  random permutations of the data order when using a sequential Bayes factor
+  analysis.}
+\label{fig:ratspermute}
+\end{figure}
+Similary, the decisions to stop for $H_0$ in the low dose and to stop for $H_1$
+in the other groups reported in Section~\ref{sec:rat} corresponds to the
+majority of decisions across the permutations (Table~\ref{tab:kangpermute}).
+\begin{table}[!htb]
+  \centering
+  \caption{Proportion of sequential Bayes factor stopping decisions for $H_{0}$
+    or $H_{1}$
+    % using Bayes factor thresholds $k_{0} = \Sexpr{k0}$ and
+    % $k_{1} = 1/\Sexpr{1/k1}$
+    across \Sexpr{prettyNum(nsim, big.mark = "'")} random permutations of the
+    data order.}
+  \label{tab:kangpermute}
+<< "kang-additional-table", results = "asis" >>=
+## compute proportion of permutations that were stopped for H0/H1
+kangsimtable <- kangsimres |>
+    mutate(group = factor(group, levels = c("Low", "Medium", "High"))) |>
+    group_by(group) |>
+    summarise(pstopH0 = paste0(round(mean(decision == "H0")*100, 1), "\\%"),
+              pstopH1 = paste0(round(mean(decision == "H1")*100, 1), "\\%"),
+              pindecisive = paste0(round(mean(decision == "indecisive")*100, 1), "\\%"))
+restablex <- xtable::xtable(kangsimtable)
+colnames(restablex) <- c("Treatment group",
+                         "Stop for $H_0$",
+                         "Stop for $H_1$",
+                         "Indecisive")
+print(restablex, floating = FALSE, include.rownames = FALSE,
+      booktabs = TRUE,
+      sanitize.text.function = function(x){x})
+@
+\end{table}
+
+\end{appendices}
+
+\begin{spacing}{1}
+<< "sessionInfo1", eval = Reproducibility, results = "asis" >>=
+## print R sessionInfo to see system information and package versions
+## used to compile the manuscript (set Reproducibility = FALSE, to not do that)
+cat("\\clearpage \\section*{Computational details}")
+@
+<< "sessionInfo2", echo = Reproducibility, results = Reproducibility >>=
+cat(paste(Sys.time(), Sys.timezone(), "\n"))
+sessionInfo()
+@
+\end{spacing}
+
+\end{document}
