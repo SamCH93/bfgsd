@@ -1,4 +1,5 @@
 all: pdf code clean
+.PHONY: all tex pdf pdf2 code clean cleanall
 
 # names of .Rnw .bib. and .bst files
 FILE=BFGSD
@@ -15,6 +16,13 @@ pdf: tex
 	pdflatex $(FILE)
 	pdflatex $(FILE)
 
+## generate .pdf file (without first knitting tex)
+pdf2:
+	pdflatex $(FILE)
+	bibtex $(FILE)
+	pdflatex $(FILE)
+	pdflatex $(FILE)
+
 ## extract R code
 code: $(FILE).Rnw
 	Rscript -e "knitr::purl('$(FILE).Rnw')" --vanilla
@@ -23,4 +31,7 @@ code: $(FILE).Rnw
 clean:  
 	-rm $(FILE).aux  $(FILE).blg  $(FILE).log  $(FILE).tex  $(FILE).bbl \
 	$(FILE).out $(FILE).brf $(FILE).tex $(FILE).synctex.gz
-	# -rm -r ./figure/
+
+cleanall: clean
+	-rm -r ./figure/
+	-rm -r ./cache/
