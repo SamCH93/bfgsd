@@ -33,6 +33,9 @@ col1 <- "#D55E00"
 col2 <- "#0072B2"
 col3 <- "#009E73"
 
+## if not set, set working directory to /paper
+## setwd("paper/")
+
 
 ## ----"cartoon-seqBF", fig.height = 4.5----------------------------------------
 ## drawing a carton of a sequential BF trajectory

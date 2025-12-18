@@ -1,8 +1,8 @@
 # Bayes Factor Group Sequential Designs
 
-This repository contains 
+This repository contains code and data to reproduce result from the manuscript
 
-- `./paper` Code and data to reproduce result from the manuscript: *Pawel, S., Held. L. (2025). Bayes Factor Group Sequential Designs. <https://github.com/SamCH93/bfgsd>*
+> Pawel, S., Held. L. (2025). Bayes Factor Group Sequential Designs. <https://github.com/SamCH93/bfgsd>
 
 To cite our work, use the following BibTeX reference
 
@@ -30,8 +30,8 @@ LaTeX installation; only tested with TeX Live 2023/Debian).
 
 ## Reproducing the results locally
 
-Make sure to have [https://www.r-project.org/](R) installed and then install the
-required R packages with
+Make sure to have [R](https://www.r-project.org/) installed and then install the
+required R packages with the R commands
 
 ``` r
 install.packages(c("remotes", "knitr", "ggplot2", "dplyr", "ggpubr", "mvtnorm",
@@ -48,4 +48,4 @@ command
 knitr::knit2pdf("BFGSD.Rnw")
 ```
 
-This should reproduce the file `paper/BFGSD.pdf`.
+This should reproduce the file `paper/BFGSD.pdf`

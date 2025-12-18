@@ -1611,8 +1611,8 @@ account through informative prior distributions. The Bayes factor is
   \label{eq:tBF}
 \end{align}
 where $t$ is the observed $t$-statistic, $n$ is the effective sample size (the
-actual number of observations/pairs for one-sample/paired $t$-tests, or the
-harmonic sum of the group sizes for the two-sample $t$-tests), and
+actual number of observations/pairs for one-sample/paired $t$-tests, or half the
+harmonic mean of the group sizes for the two-sample $t$-tests), and
 $\mathrm{T}_{\nu}(\cdot \mid \mu, \tau)_{[a,b]}$ is the density of the
 location-scale $t$ distribution with location $\mu$, scale $\tau$, and
 corresponding degrees of freedom $\nu$, truncated to the interval $[a, b]$.
@@ -1834,7 +1834,7 @@ We declare no conflict of interest.
 Data from the Low-PV trial were extracted from Table S5 in the supplement of
 \citet{Barbui2021}. Data from the weight loss rat experiment were extracted from
 Figure~ 4 in \citet{Kang2025}. Code and data to reproduce our analyses are
-openly available at \url{https://github.com/SamCH93/XXX}. A snapshot of the
+openly available at \url{https://github.com/SamCH93/bfgsd}. A snapshot of the
 repository at the time of writing is available at
 \url{https://doi.org/10.5281/zenodo.XXXXXX}. We used the statistical programming
 language \Sexpr{R.Version()[["version.string"]]} for analyses \citep{R} along
@@ -1844,7 +1844,7 @@ with the \texttt{ggplot2} \citep{Wickham2016}, \texttt{dplyr}
 \citep{Dahl2019}, \texttt{rpact} \citep{WassmerBrannath:2016}, and
 \texttt{knitr} \citep{Xie2015} packages.
 
-\onehalfspacing % Reset line spacing to 1.5 from here on
+\onehalfspacing % set line spacing to 1.5 from here on
 {\small
 \bibliographystyle{abbrvnat}
 \bibliography{bibliography}
