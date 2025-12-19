@@ -43,7 +43,7 @@
   Center for Reproducible Science and Research Synthesis (CRS) \\
   University of Zurich \\
   \texttt{\{samuel.pawel,leonhard.held\}@uzh.ch} \\ ~ \\
-  \today
+  December 19, 2025
 }
 
 %% hyperref options
@@ -54,7 +54,7 @@
   pdfsubject={},
   pdfkeywords={},
   colorlinks=true,
-  linkcolor=black,
+  linkcolor=blue,
   anchorcolor=black,
   citecolor=blue,
   urlcolor=blue,
@@ -162,16 +162,15 @@ Bayesian methods are often considered as more natural for sequential analyses
 Bayesian framework and Bayesian probabilities are, in principle, not affected by
 multiplicity issues \citep[however, see][]{Ryan2020, Zhou2023}. Two popular
 Bayesian approaches to sequential analysis are based on posterior tail
-probabilities \citep[see e.g.,][]{berry2010bayesian, Rosner2020} and Bayes
-factors. Here we focus on sequential Bayes factor designs, which have been
-applied across a wide range of domains, including biomedical research
+probabilities \citep[see e.g.,][]{berry2010bayesian, Gsponer2013, Rosner2020}
+and Bayes factors. Here we focus on sequential Bayes factor designs, which have
+been applied across a wide range of domains, including biomedical research
 \citep{Cornfield1976, Spiegelhalter2004b, Goodman2005, Johnson2009, Li2017,
-  Zhu2019, Zhou2021, Rosner2021, Pourmohamad2022, Linde2023}, the social
-sciences \citep{Schoenbrodt2017, Schoenbrodt2018, Stefan2019, Mani2021,
+  Zhu2019, Zhou2021, Rosner2021, Moerbeek2021, Pourmohamad2022, Linde2023}, the
+social sciences \citep{Schoenbrodt2017, Schoenbrodt2018, Stefan2019, Mani2021,
   Stefan2022, Stefan2024}, and A/B testing in the tech industry \citep{Deng2016,
   Lindon2022}. They can also be viewed as Bayesian generalizations of classical
-sequential designs based on likelihood ratios \citep{Wald1947, Siegmund1985,
-  Royall1997}.
+sequential designs based on likelihood ratios \citep{Wald1947, Royall1997}.
 
 The Bayes factor
 \begin{align*}
@@ -181,7 +180,7 @@ The Bayes factor
 \end{align*}
 is the data-based updating factor of the prior odds of two hypotheses $H_0$ and
 $H_1$ to the corresponding posterior odds. This update is dictated by the ratio
-of the data's marginal likelihood under each hypothesis. Thus, the hypothesis
+of the data's marginal likelihood under each hypothesis. The hypothesis
 which better predicts the data receives more support in terms of the Bayes
 factor \citep{Kass1995}. Bayes factors thus provide a direct and interpretable
 measure of relative evidence for $H_0$ and $H_1$, which, unlike posterior
@@ -310,11 +309,11 @@ simulation when Bayes factors can be expressed as a function of the
 \textit{z}-statistic (Section~\ref{sec:zstatistic}). Applications to clinical
 trials and animal experiments illustrate how the method can be used in practice
 (Section~\ref{sec:applications}). Section~\ref{sec:ttest} outlines an extension
-to a sequential version of the Bayesian \textit{t}-test used in psychological
-science \citep{Gronau2020}. The paper closes with concluding discussions,
-limitations, and opportunities for future research
-(Section~\ref{sec:discussion}). Appendix~\ref{app:package} illustrates usage of
-our R package \texttt{bfpwr} for planning sequential Bayes factor designs.
+to a sequential version of the Bayes factor \textit{t}-test \citep{Gronau2020}.
+The paper closes with concluding discussions, limitations, and opportunities for
+future research (Section~\ref{sec:discussion}). Appendix~\ref{app:package}
+illustrates usage of our R package \texttt{bfpwr} for planning sequential Bayes
+factor designs.
 
 \section{Sequential Bayes factor design characteristics}
 \label{sec:characteristics}
@@ -324,7 +323,7 @@ that point, a Bayes factor is computed and denoted by $\mathrm{BF}_{01}^i$.
 Suppose that thresholds $k_0 > 1$ and $k_1 < 1$ are used and the experiment is
 stopped as soon as evidence for either $H_0$ ($\mathrm{BF}_{01} \geq k_0$) or
 $H_1$ ($\mathrm{BF}_{01} \leq k_1$) is found. Four quantities are of central
-interest assess the usefulness of a design:
+interest to assess the usefulness of a design:
 
 \begin{enumerate}
 \item \textbf{The probability of conclusive evidence for the alternative
@@ -402,11 +401,11 @@ error (typically of the form $\sigma = \lambda / \sqrt{n}$ with $\lambda^2$ a
 unit variance and $n$ the effective sample size), and $\theta_0$ is the null
 value related to the null hypothesis $H_0$ (typically $\theta_0 = 0$).
 Table~\ref{tab:BFcritical} shows several Bayes factor types for which this is
-possible. These are related to a general class of test statistic based Bayes
-factors \citep{Johnson2005, HeldOtt2018}. Assume now that we are interested in
-the critical \textit{z}-values(s) for which $\mathrm{BF}_{01} = k$ for some $k >
-0.$ For many Bayes factors in Table~\ref{tab:BFcritical}, critical values can be
-derived in closed-form (see the right column).
+possible. These are related to a general class of Bayes factors based on test
+statistics \citep{Johnson2005, HeldOtt2018}. Assume now that we are interested
+in the critical \textit{z}-values(s) for which $\mathrm{BF}_{01} = k$ for some
+$k > 0.$ For many Bayes factors in Table~\ref{tab:BFcritical}, critical values
+can be derived in closed-form (see the right column).
 
 Although closed-form solutions are convenient, they are not necessary for
 computing design characteristics as described in the following sections. For
@@ -570,8 +569,10 @@ null hypothesis ($\mathrm{BF}_{01} = 1/\Sexpr{1/k1}$). The critical values from
 two commonly used group sequential design (GSD) methods, Pocock and
 O'Brien-Fleming, are shown as comparison. Both ensure control of the type-I
 error rate at the conventional $\alpha = 0.025$ (one-sided) in a sequential
-design with \Sexpr{length(n)} equally-spaced analyses. We can see that the value
-and shape of the critical value boundaries differs across the different Bayes
+design with \Sexpr{length(n)} equally-spaced analyses.
+Section~\ref{sec:canonical} will be explain how the type-I error rate of
+sequential Bayes factor designs can be evaluated. We can see that the value and
+shape of the critical value boundaries differs across the different Bayes
 factors. The directional null ($H_0 \colon \theta \leq 0$) vs. directional
 alternative ($H_1 \colon \theta > 0$) Bayes factor (black) shows near constant
 critical values across all analyses. In contrast, the point null ($H_0 \colon
@@ -809,15 +810,25 @@ $i$ splits into two $i + 1$ hyper-rectangles at analysis $i + 1$.
 While the exponentially growing number of hyper-rectangles poses certain
 computational challenges, we did not observe any numerical issues when
 exhaustively computing the probability of all hyper-rectangles in designs with
-even up to ten analyses. In many fields, carrying out so many analyses is
-unrealistic. For example, one or two interim analyses are by far the most common
-number of analyses in sequential clincial trials \citep{Stevely2015}.
-Nevertheless, for designs with lots of analyses, it is often sufficient to
-compute the probability of only the two hyper-rectangles where the sign of the
-$z$-statistics stays constant across analyses. The probability of the remaining
-hyper-rectangles is usually very small as it is unlikely that the $z$-statistic
-will repeatedly change its sign because of the correlation of $z$-statistics
-across analyses.
+even up to ten analyses. In many fields, designs involving such a large number
+of analyses are rarely encountered. For example, the most common number of
+interim analyses in clinical trials is only one or two, if any
+\citep{Stevely2015}.
+%% Nevertheless, for designs with lots of analyses, it is often sufficient to
+%% compute the probability of only the two hyper-rectangles where the sign of
+%% the $z$-statistics stays constant across analyses. The probability of the
+%% remaining hyper-rectangles is usually very small as it is unlikely that the
+%% $z$-statistic will repeatedly change its sign because of the correlation of
+%% $z$-statistics across analyses.
+Moreover, for Bayes factors with only one critical \textit{z}-value (e.g.,
+one-sided tests), the number of hyper-rectangles increases only linearly with
+the number of analyses. Exhaustively computing their probabilities therefore
+poses no computational problems, even for a very large number of analyses.
+%% We will illustrate such a design with 61 analyses in Section~\ref{sec:ttest}.
+%% Experimenters usually have a specific effect direction in mind, so using
+%% one-sided tests, which have only one critical \textit{z}-value, is more
+%% natural.
+
 
 \subsection{The predictive distribution of the \textit{z}-statistics}
 \label{sec:canonical}
@@ -890,22 +901,22 @@ certain stakeholders, such as a regulatory authorities in drug development
 Assuming there are $m$ analyses, the probability of evidence for $H_i \in \{H_0, H_1\}$ is
 \begin{align*}
   \Pr(\text{Evidence for}~ H_i) =
-  \sum_{j=1}^m \Pr\{\boldsymbol{Z}_{1:j} \in \boldsymbol{S}_j \mid \mu_d \boldsymbol{I}_{1:j},
+  \sum_{j=1}^m \Pr\{\boldsymbol{Z}_{1:j} \in \boldsymbol{S}_{j}^i \mid \mu_d \boldsymbol{I}_{1:j},
   (\boldsymbol{\Sigma} + \tau_d^2 \boldsymbol{I} \boldsymbol{I}^\top)_{1:j,1:j}\}
 \end{align*}
-where $1:j$ indicates indexing of the first $j$ elements and $\boldsymbol{S}_j$
-is the set of $z$-statistic stopping regions at analysis $j$. For example, assuming that $m = 3$ and that there
+where $1:j$ indicates indexing of the first $j$ elements and $\boldsymbol{S}_{j}^i$
+is the set of $z$-statistic stopping regions for $H_i$ at analysis $j$. For example, assuming that $m = 3$ and that there
 is only one critical value so that $\mathrm{BF}_{01} = k$ (e.g., a directional
 null vs. directional alternative Bayes factor in Table~\ref{tab:BFcritical}), we
 have the stopping regions for $H_1$
 \begin{align*}
-  &\boldsymbol{S}_1 = [z_{1,\text{crit}}(k_1), +\infty]&
-  &\boldsymbol{S}_2 =
+  &\boldsymbol{S}_{1}^1 = [z_{1,\text{crit}}(k_1), +\infty]&
+  &\boldsymbol{S}_{2}^1 =
   \begin{bmatrix}
     z_{1,\text{crit}}(k_0), & z_{1,\text{crit}}(k_1) \\
     z_{2,\text{crit}}(k_1), & +\infty \\
   \end{bmatrix}&
-  &\boldsymbol{S}_3 =
+  &\boldsymbol{S}_{3}^1 =
   \begin{bmatrix}
     z_{1,\text{crit}}(k_0), & z_{1,\text{crit}}(k_1) \\
     z_{2,\text{crit}}(k_0), & z_{2,\text{crit}}(k_0) \\
@@ -984,11 +995,11 @@ could help low-risk polycythaemia vera (Low-PV) patients kepping haematocrit
 levels (the volume percentage of red blood cells in blood) withing a safe range.
 The study was designed to have three analyses after 50, 100, and 150 patients
 had been followed-up, respectively. The design assumed response rates of $\pi_0
-= \Sexpr{round(100*p0H1, 1)}\%$ and $\pi_1 = \Sexpr{round(100*p1H1, 1)}\%$ in
-the control and treatment groups, corresponding to an odds ratio of $\mathrm{OR}
-= \Sexpr{round(ORH1, 1)}$. The study was stopped after the second interim
-analysis because the group sequential stopping bounds for efficacy were crossed.
-Table~\ref{tab:lowpv} summarizes the by-analysis results.
+= \Sexpr{round(100*p0H1, 1)}\%$ and $\pi_1 = \Sexpr{round(100*p1H1, 1)}\%$ under
+$H_1$ in the control and treatment groups, corresponding to an odds ratio of
+$\mathrm{OR} = \Sexpr{round(ORH1, 1)}$. The study was stopped after the second
+interim analysis because the group sequential stopping bounds for efficacy were
+crossed. Table~\ref{tab:lowpv} summarizes the by-analysis results.
 
 \begin{table}[!htb]
   \centering
@@ -1065,21 +1076,24 @@ print(restablex, floating = FALSE, include.rownames = FALSE,
 Assuming a normal likelihood for the estimated log odds ratio $\hat{\theta} =
 \log \widehat{\mathrm{OR}}$ and using the hypotheses specified by the trial
 investigators, we can compute the Bayes factor from Table~\ref{tab:BFcritical}
-contrasting $H_0 \colon \theta = 0$ to $H_1 \colon \theta = \log(\Sexpr{ORH1}) =
-\Sexpr{round(log(ORH1), 2)}$. This leads to a Bayes factor $\mathrm{BF}_{01}^1 =
-1/\Sexpr{round(1/bf1, 1)}$ in the first analysis and $\mathrm{BF}_{01}^2 =
-1/\Sexpr{round(1/bf2, 1)}$ in the second. Had we used a threshold of $k_1 =
-1/10$, the study would have thus been stopped for $H_1$ after the second
-analysis, resulting in the same decision as was made by the trial investigators
-based on a classical group sequential design.
+contrasting the point hypotheses $H_0 \colon \theta = 0$ to $H_1 \colon \theta =
+\log(\Sexpr{ORH1}) \approx \Sexpr{round(log(ORH1), 2)}$. This leads to a Bayes
+factor $\mathrm{BF}_{01}^1 = 1/\Sexpr{round(1/bf1, 1)}$ in the first analysis
+and $\mathrm{BF}_{01}^2 = 1/\Sexpr{round(1/bf2, 1)}$ in the second. Had we used
+a threshold of $k_1 = 1/10$, the study would have thus been stopped for $H_1$
+after the second analysis, resulting in the same decision as was made by the
+trial investigators based on a classical group sequential design.
 
 Suppose the trial has not been carried out and we want to plan it using a
-sequential Bayes factor design. Assuming allocation of $n$ patients to the
-control and $n$ patients to the treatment group, the approximate standard error
-of the estimated log odds ratio $\hat{\theta}$ is $\sigma = \sqrt{1/\{n \pi_0 (1
-  - \pi_0)\} + 1/\{n \pi_1 (1 - \pi_1)\}}$, see Appendix~\ref{app:selogOR}.
-Thus, assuming a canonical distribution for $z = \hat{\theta}/\sigma$ with
-information level $I = 1/\sigma^2$, we can apply the results from
+sequential Bayes factor design. Assuming allocation of $n$ patients are
+allocated to each group, the approximate standard deviation of the estimated log
+odds ratio $\hat{\theta}$ is $\sigma = \sqrt{1/\{n \pi_0 (1 - \pi_0)\} + 1/\{n
+  \pi_1 (1 - \pi_1)\}}$. Once data are observed, it is estimated through the
+standard error obtained by plugging in the estimated rates $\hat{\pi}_0$ and
+$\hat{\pi}_1$ \citep{Bland2000}. Assuming a normal distribution for
+$\hat{\theta}$ around the true log odds ratio $\theta$ with standard deviation
+$\sigma$, implies a canonical distribution for $z = \hat{\theta}/\sigma$ with
+information level $I = 1/\sigma^2$. We can therefore apply the results from
 Section~\ref{sec:zstatistic} to compute sequential Bayes factor design
 characteristics.
 
@@ -1140,6 +1154,7 @@ third analysis, but remain below 90\%. To achieve a probability of 90\%, the
 maximum sample size and/or the number of interim analyses must be further
 increased.
 
+
 << "low-PV-design-sample-size" >>=
 ## power function to use for root-finding maximum sample size
 powerfun. <- function(nmax, m, H = "H1") {
@@ -1173,6 +1188,16 @@ nmax1 <- uniroot(f = rootfun, interval = c(10, 1000), m = m,
 nmax0 <- uniroot(f = rootfun, interval = c(10, 1000), m = m,
                  H = "H0")$root
 @
+
+Keeping the number of analyses fixed at three, we can use numerical root-finding
+(e.g., \texttt{uniroot} in R) to determine the maximum sample size size to
+achieve a \Sexpr{round(100*pow, 1)}\% probability of conclusive evidence. This
+leads to $n_3 = \Sexpr{ceiling(nmax0)}$ under $H_0$ and $n_3 =
+\Sexpr{ceiling(nmax1)}$ under $H_1$, translating into $\Sexpr{ceiling(nmax0)/3}$
+and $\Sexpr{ceiling(nmax1)/3}$ additional patients per group at each analysis,
+respectively. Taking the maximum of the two would ensure that the trial produces
+conclusive evidence with high probability.
+
 
 \begin{figure}[!htb]
 << "low-PV-design-plot2", fig.height = 7.5 >>=
@@ -1209,11 +1234,17 @@ plotDF <- do.call("rbind", lapply(X = seq(1, nrow(grid)), FUN = function(i) {
     lowPVdesign(nmax = grid$nmax[i], m = grid$m[i])
 }))
 
+linesDF <- rbind(data.frame(dp = "'under' ~ italic(H[0]) * ':' ~ theta == 0",
+                            x = nmax0),
+                 data.frame(dp = "'under' ~ italic(H[1]) * ':' ~ theta == 1.1",
+                            x = nmax1))
 probplot <- ggplot(plotDF,
                    aes(x = nmax, y = p,
                        color = factor(m, ordered = TRUE))) +
     facet_grid(type ~ dp, scales = "free_y",
                labeller = label_parsed, switch = "y") +
+    geom_vline(data = linesDF, aes(xintercept = ceiling(x)), lty = 2,
+               alpha = 0.3) +
     geom_line(alpha = 0.9) +
     ## geom_point() +
     scale_y_continuous(labels = scales::percent) +
@@ -1242,6 +1273,8 @@ Nplot <- ggplot(Nplotdf,
                 aes(x = nmax, y = yvar, color = factor(m, ordered = TRUE))) +
     facet_grid(type ~ dp, scales = "free_y",
                labeller = label_parsed, switch = "y") +
+    geom_vline(data = linesDF,
+               aes(xintercept = ceiling(x)), lty = 2, alpha = 0.3) +
     geom_line(alpha = 0.9, show.legend = FALSE) +
     labs(x = "Maximum sample size (per group)", y = "") +
     theme_bw() +
@@ -1255,16 +1288,13 @@ ggpubr::ggarrange(plotlist = list(probplot, Nplot), ncol = 1, align = "v",
                   heights = c(1, 1))
 @
 \caption{Sequential Bayes factor design characteristics for the Low-PV trial
-  \citep{Barbui2021} for differing maximum sample sizes and number of analyses.}
+  \citep{Barbui2021} for differing maximum sample sizes and number of analyses.
+  The dashed lines show the maximum sample sizes corresponding to
+  \Sexpr{round(100*pow, 1)}\% probability of correct evidence for \Sexpr{m}
+  analyses.}
 \label{fig:lowPVdesign2}
 \end{figure}
 
-Keeping the number of analyses fixed at three, we can use numerical root-finding
-to determine the maximum sample size size to achieve a probability of conclusive
-evidence of \Sexpr{round(100*pow, 1)}\%. This leads to $n_3 =
-\Sexpr{ceiling(nmax0)}$ under $H_0$ and $n_3 = \Sexpr{ceiling(nmax1)}$ under
-$H_1$. Thus taking the maximum of the two would ensure that the trial would
-produce conclusive evidence with high probability.
 
 Figure~\ref{fig:lowPVdesign2} shows design characteristics varying the maximum
 samples size and also the numbers of analyses. This includes also only one
@@ -1296,15 +1326,10 @@ increases in the maximum sample size for designs with many analyses. Finally,
 increasing the number of analyses decreases the expected sample size
 (middle-bottom plot), while it has a non-monotone effect on the standard
 deviation of the sample size -- increasing for smaller maximum sample sizes and
-decreasing with larger maximum sample sizes. In sum,
-% %in the design of the Low-PV trial,
-compared to a fixed design, a sequential design with even only two analyses can
-drastically lower the expected sample size and increase the probability of
-correct evidence, while only slightly increasing the probability of misleading
-evidence.
-%% In practice, the challenge is to find a combination of maximum sample size
-%% and number of analyses that can be implemented and produces the desired
-%% probabilities of correct evidence and expected sample size.
+decreasing with larger maximum sample sizes. In sum, compared to a fixed design,
+a sequential design with even only two analyses can drastically lower the
+expected sample size and increase the probability of correct evidence, while
+only slightly increasing the probability of misleading evidence.
 
 
 
@@ -1314,13 +1339,15 @@ In animal research, just as in clinical trials, every additional observation
 carries significant ethical weight. Reducing sample size is hence of paramount
 interest, which is one pillar of the 3R (``Replace, Reduce, Refine'') principles
 in animal research \citep{RussellBurch1959}. We will now reanalyze data from a
-preclinical experiment with rats that was previously analyzed by
-\citet{Kang2025}. In this experiment, rats were randomly assigned to different
-dose levels of a candidate drug or to a control group to estimate the drug's
-effect on weight loss. The top plot of Figure~\ref{fig:ratdata} shows the
-measured weight loss values across groups. As can be seen, the low dose group
-(yellow) differs little from the control group (black), whereas the medium
-(blue) and high dose (blue) groups show substantially higher weight loss.
+preclinical experiment with rats, which was retrospectively reported and
+analyzed by \citet{Kang2025}. In the experiment, rats were randomly assigned to
+different dose levels of a candidate drug or to a control group to estimate the
+drug's effect on weight loss. Information that could be used to identify the
+drugs or studies has been removed by \citet{Kang2025} due to confidentiality
+issues. The top plot of Figure~\ref{fig:ratdata} shows the measured weight loss
+values across groups. As can be seen, the low dose group (yellow) differs little
+from the control group (black), whereas the medium (blue) and high dose (blue)
+groups show substantially higher weight loss.
 
 \begin{figure}[!htb]
 << "preclinical-data", fig.height = 5 >>=
@@ -1467,21 +1494,27 @@ differences in weight loss between the treatment groups and the control group,
 denoted by $\theta_i$ with $i \in \{\text{low},~\text{medium},~\text{high}\}$.
 The investigators defined a mean difference of at least 5 grams as effective,
 which we will now use to specify the alternative hypothesis. The Bayes factor
-contrasting $H_0 \colon \theta_i = 0$ to $H_1 \colon \theta_i = 5$ is shown in
-the bottom plot of Figure~\ref{fig:ratdata} for each treatment group (color). An
-observation from each group is added at each step until the maximum group size
-is reached. Note that the order in which the data were collected is unknown,
-which is why a random permutation is shown here. Appendix~\ref{app:rats} shows
-that also for other permutations of the data, similar results are obtained. As
-the sample size increases, the Bayes factor in the low dose group (yellow)
-increases and reaches $\mathrm{BF}_{01} > 10$ after 10 rats, suggesting strong
-evidence for the absence of an effect over its presence. In contrast, the Bayes
-factors in the medium (blue) and high (green) dose groups decrease with
-increasing sample size, surpassing the threshold for strong evidence of
-$\mathrm{BF}_{01} < 1/10$ after 12 and 8 rats, respectively. Thus, if the
-experiment had been conducted using this sequential Bayes factor design,
-\Sexpr{ratssaved$controlsaved} rats from the control group and
-\Sexpr{ratssaved$treatsaved} rats from the treatment groups could have been
+contrasting the point hypotheses $H_0 \colon \theta_i = 0$ to $H_1 \colon
+\theta_i = 5$ is shown in the bottom plot of Figure~\ref{fig:ratdata} for each
+treatment group (color). An observation from each group is added at each step
+until the maximum group size is reached. In each step the mean difference
+$\hat{\theta}_i = \widehat{\mathrm{E}}(y_{i}) -
+\widehat{\mathrm{E}}(y_{\text{control}})$ and its standard error $\sigma_i =
+\sqrt{\widehat{\mathrm{Var}}(y_{i})/n_i +
+  \widehat{\mathrm{Var}}(y_{\text{control}})/n_{\text{control}}}$ are estimated
+from the data and used to obtain the Bayes factor. Note that the order in which
+the data were collected is unknown, which is why a random permutation is shown
+here. Appendix~\ref{app:rats} shows that also for other permutations of the
+data, similar results are obtained. As the sample size increases, the Bayes
+factor in the low dose group (yellow) increases and reaches $\mathrm{BF}_{01} >
+10$ after 10 rats, suggesting strong evidence for the absence of an effect over
+its presence. In contrast, the Bayes factors in the medium (blue) and high
+(green) dose groups decrease with increasing sample size, surpassing the
+threshold for strong evidence of $\mathrm{BF}_{01} < 1/10$ after 12 and 8 rats,
+respectively. Thus, if the experiment had been conducted using this sequential
+Bayes factor design, $8 - \max(10, 12, 8)/2 = \Sexpr{ratssaved$controlsaved}$
+rats from the control group and $6 + 12 + 6 - (10 + 12 + 8)/2
+=\Sexpr{ratssaved$treatsaved}$ rats from the treatment groups could have been
 saved, totalling to \Sexpr{ratssaved$totalsaved} saved rats.
 
 
@@ -1571,8 +1604,8 @@ motivated as the posterior distribution of the mean difference based on the
 original data and a flat prior. Note that if we would also use this design prior
 as the analysis prior (instead of the point hypothesis $H_1 \colon \theta =
 \Sexpr{pm}$), a ``replication Bayes factor'' \citep{VerhagenWagenmakers2014,
-  Ly_etal2018, PawelHeld2022} would be obtained. However, here we will only
-consider testing the same alternative hypotheses as in the original study.
+  PawelHeld2022} would be obtained. However, here we will consider testing the
+same alternative hypotheses as in the original study.
 
 For the medium and high dose groups, the probabilities of finding strong
 evidence for the alternative over the null hypothesis ($\mathrm{BF}_{01} \leq
@@ -1620,7 +1653,7 @@ $\mathrm{NCT}_{\nu}(\cdot \mid \lambda)$ is the density of the non-central $t$
 distribution with non-centrality parameter $\lambda$. When the hyperparameters
 are set to $\kappa = 1$, $\mu = 0$, $a = -\infty$, $b=+\infty$, the prior
 becomes a Cauchy distribution, and the Bayes factor reduces to the widely used
-``Jeffreys-Zellner-Siow'' (JZS) Bayes factor \citep{Jeffreys1939, Zellner1980}.
+``Jeffreys-Zellner-Siow'' (JZS) Bayes factor \citep{Jeffreys:1961, Zellner1980}.
 The JZS Bayes factor is typically used with a default scale of $\tau =
 1/\sqrt{2}$, as e.g., implemented in the \texttt{BayesFactor} R package
 \citep{Rouder2009}.
@@ -1765,40 +1798,41 @@ average sample size of \Sexpr{round(res1$EN1, 1)}. These are very close to the
 70.6\%, 1.6\%, and 69 reported by \citet{Schoenbrodt2018}, which were estimated
 with simulation. Similarly, assuming no effect ($\theta = 0$, right plot), we
 obtain \Sexpr{round(100*tail(res0$cumpH1, n = 1), 1)}\% to stop for $H_1$,
-\Sexpr{round(100*tail(res0$cumpH0, n = 1), 1)}\% to stop for $H_0$ , and an
+\Sexpr{round(100*tail(res0$cumpH0, n = 1), 1)}\% to stop for $H_0$, and an
 average sample size of \Sexpr{round(res0$EN1, 1)}, which are again very close to
 the 0.6\%, 70.9\%, and 66 reported by \citet{Schoenbrodt2018}. In sum, the
 \textit{z}-statistic perspective enables quick and accurate calculation of key
 design characteristics of sequential designs based on the Bayes factor
-\textit{t}-test, one of the most important sequential Bayes factor tests used in
-practice.
+\textit{t}-test, one of the most commonly used sequential Bayes factor tests.
 
 
 \section{Discussion}
 \label{sec:discussion}
 
-Bayes factors offer an intuitive framework for sequential data analysis: Data
-can be analyzed repeatedly without concerns about multiplicity, and stopping
-decisions are naturally linked to interpretable updates of prior beliefs.
-Despite these advantages, the broader adoption of sequential Bayes factor
-designs has been limited, perhaps because of the difficulty of computing their
-design characteristics. Existing approaches typically rely on extensive
-simulation, which can be computationally costly, sensitive to Monte Carlo error,
-and inconvenient when exploring many design options.
+Bayes factors are natural tools for sequential data analysis: Data can be
+repeatedly analyzed without concerns about multiplicity, stopping decisions are
+naturally linked to interpretable updates of prior to posterior odds of
+competing hypotheses, and, unlike tail probabilities, there is no need to
+specify prior probabilities for competing hypotheses. Despite these advantages,
+the broader adoption of sequential Bayes factor designs has been limited, one
+potential reason being the difficulty of computing their design characteristics.
+Existing approaches typically rely on extensive simulation, which can be
+computationally costly, sensitive to Monte Carlo error, and inconvenient when
+exploring many design options.
 
 In this paper, we introduced a general approach that overcomes these limitations
 by expressing Bayes factors as functions of \textit{z}-statistics and and
 extending results from classical group sequential design theory. This
 perspective showed that Bayes factor stopping rules correspond to sets of
 hyper-rectangles regions in the space of accumulating \textit{z}-statistics.
-Under the canonical \textit{z}-statistic distribution, these regions can be
-integrated efficiently using multivariate normal probabilities, eliminating the
-need for simulation. The resulting computations are fast, accurate, and scalable
-to designs with many interim looks. The approach also naturally incorporates
-design priors, enabling experiments to account for parameter uncertainty in the
-design. Traditional fixed parameter calculations are a special case, thus
-enabling flexible exploration of both Bayesian and frequentist operating
-characteristics within a unified framework.
+Under the canonical \textit{z}-statistic distribution, the probability of these
+regions can be computed efficiently using multivariate normal integration,
+eliminating the need for simulation. The resulting computations are fast,
+accurate, and scalable to designs with many interim looks. The approach also
+naturally incorporates design priors, enabling experiments to account for
+parameter uncertainty at the design stage. Traditional fixed parameter
+calculations are a special case, thus enabling flexible exploration of both
+Bayesian and frequentist operating characteristics within a unified framework.
 
 There are, however, some limitations. The method requires that the Bayes factor
 can be expressed as a function of the \textit{z}-statistic and that the
@@ -1807,12 +1841,11 @@ multivariate normal distribution. Situations where these assumptions are not met
 (e.g., binary data with small sample size and/or extreme probabilities) may
 still require simulation or other numerical methods for computing design
 characteristics. Developing modifications for these situations could be one
-avenue for future research. Furthermore, while multivariate normal integration
-is highly efficient for realistic numbers of interim analyses, extremely large
-numbers of looks remain computationally challenging. Nevertheless, such designs
-are logistically challenging and rarely used in practice. For example, the most
-common number of interim analyses in clinical trials is only one or two, if any
-\citep{Stevely2015}.
+avenue for future research.
+%% Furthermore, while multivariate normal integration is highly efficient for
+%% realistic numbers of interim analyses, extremely large numbers of looks
+%% remain computationally challenging. Nevertheless, such designs are
+%% logistically challenging and rarely used in practice.
 
 To conclude, many sequential Bayes factor designs can be planned as rapidly and
 reliably as classical group sequential designs. Our accompanying R package
@@ -1904,29 +1937,29 @@ Similarly, applying the law of total covariance, its covariance is
   &= \boldsymbol{\Sigma} + \tau^2_d \boldsymbol{I} \boldsymbol{I}^\top. \\
 \end{align*}
 
-\section{Standard error of the log odds ratio}
-\label{app:selogOR}
-Assuming two independent binomial random variables $Y_0 \sim \mathrm{Bin}(n_0,
-\pi_0)$ and $Y_1 \sim \mathrm{Bin}(n_1, \pi_1)$, the variances of the estimated
-success rates $\hat{\pi}_0 = y_0/n_0$ and $\hat{\pi}_1 = y_1/n_1$ are
-$\mathrm{Var}(\hat{\pi}_i) = \{\pi_i (1 - \pi_i)\}/n_i$ for $i \in \{0, 1\}$.
-Using the delta method, the approximate variances of the estimated log odds
-$\hat{\psi}_i = \log \{\hat{\pi}_i/(1 - \hat{\pi}_i)\}$ can be obtained by
-\begin{align*}
-  \mathrm{Var}(\hat{\psi}_i)
-  &= \mathrm{Var}(\hat{\pi}_i) \times \left[\frac{\mathrm{d}
-    \log \{\pi_i/(1 - \pi_i)\}}{\mathrm{d} \pi_i}\right]^2 \\
-  &= \frac{\pi_i (1 - \pi_i)}{n_i} \times \frac{1}{\pi_i^2 (1 - \pi_i)^2} \\
-  &= \frac{1}{n_i \pi_i (1 - \pi_i)}
-\end{align*}
-for $i \in \{0, 1\}$. The approximate variance of the estimated log odds ratio
-$\hat{\theta} = \hat{\psi}_1 - \hat{\psi}_0$ is hence by independence
-\begin{align*}
-  \mathrm{Var}(\hat{\theta})
-  &= \mathrm{Var}(\hat{\pi}_1) + \mathrm{Var}(\hat{\pi}_0) \\
-  &= \frac{1}{n_1 \pi_1 (1 - \pi_1)} + \frac{1}{n_0 \pi_0 (1 - \pi_0)}.
-\end{align*}
-Taking the square root produces the approximate standard error of $\hat{\theta}$.
+%% \section{Standard deviation of the log odds ratio}
+%% \label{app:selogOR}
+%% Assuming two independent binomial random variables $Y_0 \sim \mathrm{Bin}(n_0,
+%% \pi_0)$ and $Y_1 \sim \mathrm{Bin}(n_1, \pi_1)$, the variances of the estimated
+%% success rates $\hat{\pi}_0 = y_0/n_0$ and $\hat{\pi}_1 = y_1/n_1$ are
+%% $\mathrm{Var}(\hat{\pi}_i) = \{\pi_i (1 - \pi_i)\}/n_i$ for $i \in \{0, 1\}$.
+%% Using the delta method, the approximate variances of the estimated log odds
+%% $\hat{\psi}_i = \log \{\hat{\pi}_i/(1 - \hat{\pi}_i)\}$ can be obtained by
+%% \begin{align*}
+%%   \mathrm{Var}(\hat{\psi}_i)
+%%   &= \mathrm{Var}(\hat{\pi}_i) \times \left[\frac{\mathrm{d}
+%%     \log \{\pi_i/(1 - \pi_i)\}}{\mathrm{d} \pi_i}\right]^2 \\
+%%   &= \frac{\pi_i (1 - \pi_i)}{n_i} \times \frac{1}{\pi_i^2 (1 - \pi_i)^2} \\
+%%   &= \frac{1}{n_i \pi_i (1 - \pi_i)}
+%% \end{align*}
+%% for $i \in \{0, 1\}$. The approximate variance of the estimated log odds ratio
+%% $\hat{\theta} = \hat{\psi}_1 - \hat{\psi}_0$ is hence by independence
+%% \begin{align*}
+%%   \mathrm{Var}(\hat{\theta})
+%%   &= \mathrm{Var}(\hat{\pi}_1) + \mathrm{Var}(\hat{\pi}_0) \\
+%%   &= \frac{1}{n_1 \pi_1 (1 - \pi_1)} + \frac{1}{n_0 \pi_0 (1 - \pi_0)}.
+%% \end{align*}
+%% Taking the square root produces the approximate standard error of $\hat{\theta}$.
 
 \section{Sensitivity analysis for rat experiment}
 \label{app:rats}
@@ -1937,7 +1970,7 @@ sensitivity analyses regarding the random permutation of the data set from
 representative, or even a conservative estimate compared to the the permutation
 distribution in Figure~\ref{fig:ratspermute}.
 \begin{figure}[!htb]
-<< "kang-additional-plot", fig.height = 3 >>=
+<< "kang-additional-plot", fig.height = 2.5 >>=
 set.seed(42)
 nsim <- 1000
 k1 <- 1/10

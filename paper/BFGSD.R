@@ -549,11 +549,17 @@ plotDF <- do.call("rbind", lapply(X = seq(1, nrow(grid)), FUN = function(i) {
     lowPVdesign(nmax = grid$nmax[i], m = grid$m[i])
 }))
 
+linesDF <- rbind(data.frame(dp = "'under' ~ italic(H[0]) * ':' ~ theta == 0",
+                            x = nmax0),
+                 data.frame(dp = "'under' ~ italic(H[1]) * ':' ~ theta == 1.1",
+                            x = nmax1))
 probplot <- ggplot(plotDF,
                    aes(x = nmax, y = p,
                        color = factor(m, ordered = TRUE))) +
     facet_grid(type ~ dp, scales = "free_y",
                labeller = label_parsed, switch = "y") +
+    geom_vline(data = linesDF, aes(xintercept = ceiling(x)), lty = 2,
+               alpha = 0.3) +
     geom_line(alpha = 0.9) +
     ## geom_point() +
     scale_y_continuous(labels = scales::percent) +
@@ -582,6 +588,8 @@ Nplot <- ggplot(Nplotdf,
                 aes(x = nmax, y = yvar, color = factor(m, ordered = TRUE))) +
     facet_grid(type ~ dp, scales = "free_y",
                labeller = label_parsed, switch = "y") +
+    geom_vline(data = linesDF,
+               aes(xintercept = ceiling(x)), lty = 2, alpha = 0.3) +
     geom_line(alpha = 0.9, show.legend = FALSE) +
     labs(x = "Maximum sample size (per group)", y = "") +
     theme_bw() +
@@ -899,7 +907,7 @@ design # print design summary
 plot(design) # plot design under design prior (top) and under H0 (bottom)
 
 
-## ----"kang-additional-plot", fig.height = 3-----------------------------------
+## ----"kang-additional-plot", fig.height = 2.5---------------------------------
 set.seed(42)
 nsim <- 1000
 k1 <- 1/10
