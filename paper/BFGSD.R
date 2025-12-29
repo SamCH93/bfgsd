@@ -515,7 +515,7 @@ nmax0 <- uniroot(f = rootfun, interval = c(10, 1000), m = m,
                  H = "H0")$root
 
 
-## ----"low-PV-design-plot2", fig.height = 7.5----------------------------------
+## ----"low-PV-design-plot2", fig.height = 8.2----------------------------------
 lowPVdesign <- function(nmax = 75, m = 3) {
     n <- seq(nmax/m, nmax, length.out = m)
     se1 <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p1H1*(1 - p1H1)*n))
@@ -582,8 +582,13 @@ Nplotdf1 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
     dplyr::mutate(yvar = EN, type = "'E(sample size)'")
 Nplotdf2 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
     dplyr::mutate(yvar = SDN, type = "'SD(sample size)'")
-    ## dplyr::mutate(yvar = SDN/EN, type = "'COV(sample size)'")
-Nplotdf <- rbind(Nplotdf1, Nplotdf2)
+Nplotdf3 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
+    dplyr::mutate(yvar = SDN/EN, type = "'COV(sample size)'")
+Nplotdf <- rbind(Nplotdf1, Nplotdf2, Nplotdf3) |>
+    dplyr::mutate(type = factor(type,
+                                levels = c("'E(sample size)'",
+                                           "'SD(sample size)'",
+                                           "'COV(sample size)'")))
 Nplot <- ggplot(Nplotdf,
                 aes(x = nmax, y = yvar, color = factor(m, ordered = TRUE))) +
     facet_grid(type ~ dp, scales = "free_y",
@@ -596,11 +601,11 @@ Nplot <- ggplot(Nplotdf,
     theme(panel.grid.minor = element_blank(),
           legend.position = "top",
           strip.background = element_blank(),
-          strip.text.x = element_text(colour = NA, margin = margin(t = 0, b = 0)),
+          strip.text.x = element_text(colour = NA, margin = margin(0, 0, 0, 0)),
           strip.placement = "outside",
           strip.text.y = element_text(size = 9))
 ggpubr::ggarrange(plotlist = list(probplot, Nplot), ncol = 1, align = "v",
-                  heights = c(1, 1))
+                  heights = c(5/2.5, 5/2))
 
 
 ## ----"preclinical-data", fig.height = 5---------------------------------------

@@ -108,26 +108,7 @@ col3 <- "#009E73"
 
 %% should be less than 250 words
 \begin{abstract}
-  \noindent The Bayes factor, the data-based updating factor from prior to
-  posterior odds, is a principled measure of relative evidence for two competing
-  hypotheses. It is naturally suited to sequential data analysis in settings
-  such as clinical trials and animal experiments, where early stopping for
-  efficacy or futility is desirable. However, designing such studies is
-  challenging because computing design characteristics, such as the probability
-  of obtaining conclusive evidence or the expected sample size, typically
-  requires computationally intensive Monte Carlo simulations, as no closed-form
-  or efficient numerical methods exist. To address this issue, we extend results
-  from classical group sequential design theory to sequential Bayes factor
-  designs. The key idea is to derive Bayes factor stopping regions in terms of
-  the \textit{z}-statistic and use the known distribution of the cumulative
-  \textit{z}-statistics to compute stopping probabilities through multivariate
-  normal integration. The resulting method is fast, accurate, and
-  simulation-free. We illustrate it with examples from clinical trials, animal
-  experiments, and psychological studies. We also provide an open-source
-  implementation in the \texttt{bfpwr} R package. Our method makes exploring
-  sequential Bayes factor designs as straightforward as classical group
-  sequential designs, enabling experiments to rapidly design informative and
-  efficient experiments. \\
+  \noindent The Bayes factor, the data-based updating factor from prior to posterior odds, is a principled measure of relative evidence for two competing hypotheses. It is naturally suited to sequential data analysis in settings such as clinical trials and animal experiments, where early stopping for efficacy or futility is desirable. However, designing such studies is challenging because computing design characteristics, such as the probability of obtaining conclusive evidence or the expected sample size, typically requires computationally intensive Monte Carlo simulations, as no closed-form or efficient numerical methods exist. To address this issue, we extend results from classical group sequential design theory to sequential Bayes factor designs. The key idea is to derive Bayes factor stopping regions in terms of the \textit{z}-statistic and use the known distribution of the cumulative \textit{z}-statistics to compute stopping probabilities through multivariate normal integration. The resulting method is fast, accurate, and simulation-free. We illustrate it with examples from clinical trials, animal experiments, and psychological studies. We also provide an open-source implementation in the \texttt{bfpwr} R package. Our method makes exploring sequential Bayes factor designs as straightforward as classical group sequential designs, enabling experiments to rapidly design informative and efficient experiments. \\
   \noindent \textit{Keywords}: Bayesian hypothesis testing, design prior,
   predictive power, sample size determination, sequential clinical trials
 \end{abstract}
@@ -382,7 +363,10 @@ $H_1$ is
 }
 \noindent and likewise for $\mathrm{E}(n^2)$, based on which also the variance
 of the sample size can be computed by
-$$\mathrm{Var}(n) = \mathrm{E}(n^2) - \mathrm{E}(n)^2.$$ Each of these
+$$\mathrm{Var}(n) = \mathrm{E}(n^2) - \mathrm{E}(n)^2.$$ From these, the
+coefficient of variation $\mathrm{COV}(n) =
+\sqrt{\mathrm{Var}(n)}/\mathrm{E}(n)$ may also be computed to quantify the
+variation of the sample size in relation to expected sample size. Each of these
 quantities thus consists of a (weighted) sum of analysis-wise stopping
 probabilities. These stopping probabilities are generally hard to compute due to
 the accumulating data having a complex distribution with dependence across
@@ -391,7 +375,7 @@ approximating design characteristics. However, in the following we will show
 that by assuming a particular form of Bayes factor and data, fast and
 simulation-free computation is possible.
 
-\section{\textit{Z}-statistic based Bayes factors}
+\section{Bayes factors based on \textit{z}-statistics}
 \label{sec:zstatistic}
 When testing hypotheses related to an unknown parameter $\theta$, many types of
 Bayes factors $\mathrm{BF}_{01}$ can be expressed as a function of the
@@ -570,7 +554,7 @@ two commonly used group sequential design (GSD) methods, Pocock and
 O'Brien-Fleming, are shown as comparison. Both ensure control of the type-I
 error rate at the conventional $\alpha = 0.025$ (one-sided) in a sequential
 design with \Sexpr{length(n)} equally-spaced analyses.
-Section~\ref{sec:canonical} will be explain how the type-I error rate of
+Section~\ref{sec:canonical} will describe how the type-I error rate of
 sequential Bayes factor designs can be evaluated. We can see that the value and
 shape of the critical value boundaries differs across the different Bayes
 factors. The directional null ($H_0 \colon \theta \leq 0$) vs. directional
@@ -609,7 +593,7 @@ ggplot(data = zDF, aes(x = n, y = z, color = type)) +
 \end{figure}
 
 
-\subsection{\textit{Z}-statistic stopping regions}
+\subsection{Stopping regions based on \textit{z}-statistics}
 Denote by $z_i$ the \textit{z}-value at analysis $i$ and by
 $z_{i,\text{crit}}(k)$ the critical value(s) for which the Bayes factor equals
 the threshold $\mathrm{BF}_{01} = k$. For Bayes factors with only one critical
@@ -1089,8 +1073,8 @@ sequential Bayes factor design. Assuming allocation of $n$ patients are
 allocated to each group, the approximate standard deviation of the estimated log
 odds ratio $\hat{\theta}$ is $\sigma = \sqrt{1/\{n \pi_0 (1 - \pi_0)\} + 1/\{n
   \pi_1 (1 - \pi_1)\}}$. Once data are observed, it is estimated through the
-standard error obtained by plugging in the estimated rates $\hat{\pi}_0$ and
-$\hat{\pi}_1$ \citep{Bland2000}. Assuming a normal distribution for
+usual standard error obtained from plugging in the estimated rates $\hat{\pi}_0$
+and $\hat{\pi}_1$ \citep{Bland2000}. Assuming a normal distribution for
 $\hat{\theta}$ around the true log odds ratio $\theta$ with standard deviation
 $\sigma$, implies a canonical distribution for $z = \hat{\theta}/\sigma$ with
 information level $I = 1/\sigma^2$. We can therefore apply the results from
@@ -1145,14 +1129,13 @@ ggplot(data = plotdf, aes(x = n, y = probability, color = type)) +
 Figure~\ref{fig:lowPVdesign} shows the probability of obtaining conclusive
 evidence for $H_1$ (blue), $H_0$ (red), or to remain inconclusive (black) by
 each of the three analyses, assuming that data are generated under $H_1$
-($\theta = \log(\Sexpr{ORH1}) = \Sexpr{round(log(ORH1), 2)}$, left plot) or
-under $H_0$ ($\theta = 0$, right plot). Three equally-spaced analyses at 25, 50,
-and 75 patients per group are considered, as in the original trial. We can see
-that the probabilities of conclusive evidence for the corresponding true
-hypotheses are very similar under both hypotheses. Both surpass 80\% after the
-third analysis, but remain below 90\%. To achieve a probability of 90\%, the
-maximum sample size and/or the number of interim analyses must be further
-increased.
+($\theta = \Sexpr{round(log(ORH1), 2)}$, left plot) or under $H_0$ ($\theta =
+0$, right plot). Three equally-spaced analyses at 25, 50, and 75 patients per
+group are considered, as in the original trial. We can see that the
+probabilities of conclusive evidence for the corresponding true hypotheses are
+very similar under both hypotheses. Both surpass 80\% after the third analysis,
+but remain below 90\%. To achieve a probability of 90\%, the maximum sample size
+and/or the number of interim analyses must be further increased.
 
 
 << "low-PV-design-sample-size" >>=
@@ -1200,7 +1183,7 @@ conclusive evidence with high probability.
 
 
 \begin{figure}[!htb]
-<< "low-PV-design-plot2", fig.height = 7.5 >>=
+<< "low-PV-design-plot2", fig.height = 8.2 >>=
 lowPVdesign <- function(nmax = 75, m = 3) {
     n <- seq(nmax/m, nmax, length.out = m)
     se1 <- sqrt(1/(p0H1*(1 - p0H1)*n) + 1/(p1H1*(1 - p1H1)*n))
@@ -1267,8 +1250,13 @@ Nplotdf1 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
     dplyr::mutate(yvar = EN, type = "'E(sample size)'")
 Nplotdf2 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
     dplyr::mutate(yvar = SDN, type = "'SD(sample size)'")
-    ## dplyr::mutate(yvar = SDN/EN, type = "'COV(sample size)'")
-Nplotdf <- rbind(Nplotdf1, Nplotdf2)
+Nplotdf3 <- subset(plotDF, type == "'Pr(Correct evidence)'") |>
+    dplyr::mutate(yvar = SDN/EN, type = "'COV(sample size)'")
+Nplotdf <- rbind(Nplotdf1, Nplotdf2, Nplotdf3) |>
+    dplyr::mutate(type = factor(type,
+                                levels = c("'E(sample size)'",
+                                           "'SD(sample size)'",
+                                           "'COV(sample size)'")))
 Nplot <- ggplot(Nplotdf,
                 aes(x = nmax, y = yvar, color = factor(m, ordered = TRUE))) +
     facet_grid(type ~ dp, scales = "free_y",
@@ -1281,11 +1269,11 @@ Nplot <- ggplot(Nplotdf,
     theme(panel.grid.minor = element_blank(),
           legend.position = "top",
           strip.background = element_blank(),
-          strip.text.x = element_text(colour = NA, margin = margin(t = 0, b = 0)),
+          strip.text.x = element_text(colour = NA, margin = margin(0, 0, 0, 0)),
           strip.placement = "outside",
           strip.text.y = element_text(size = 9))
 ggpubr::ggarrange(plotlist = list(probplot, Nplot), ncol = 1, align = "v",
-                  heights = c(1, 1))
+                  heights = c(5/2.5, 5/2))
 @
 \caption{Sequential Bayes factor design characteristics for the Low-PV trial
   \citep{Barbui2021} for differing maximum sample sizes and number of analyses.
@@ -1302,7 +1290,7 @@ analysis which corresponds to a fixed design. Note that our approach can compute
 these design characteristics in a few seconds, whereas simulating all these
 designs would introduce Monte Carlo error and take substantially longer as for
 every combination a sequential trial has to be simulated many times. From the
-top plots, we can see that the probability of obtaining ``correct'' evidence
+top-row plots, we can see that the probability of obtaining ``correct'' evidence
 (i.e., $\mathrm{BF}_{01} \leq 1/\Sexpr{1/k1}$, if $H_1$ is true and
 $\mathrm{BF}_{01} \geq \Sexpr{k0}$, if $H_0$ is true) increases with increasing
 maximum sample size (x axis). Increasing the number of analyses (color) also
@@ -1310,26 +1298,40 @@ increases the probability of obtaining correct evidence for low maximum sample
 sizes. However, for maximum sample sizes higher than around 110, increasing the
 number of analyses actually decreases the probability of obtaining correct
 evidence. This is because a design with more analyses has also higher chances of
-producing misleading evidence and stopping for the wrong hypothesis
-(upper-middle plot).
+producing misleading evidence (i.e., $\mathrm{BF}_{01} \geq \Sexpr{k0}$ if $H_1$
+is true and $\mathrm{BF}_{01} \leq 1/\Sexpr{1/k1}$ if $H_0$ is true) and
+stopping for the wrong hypothesis (second-row plots).
 
-The probability of misleading evidence (i.e., $\mathrm{BF}_{01} \geq \Sexpr{k0}$
-if $H_1$ is true and $\mathrm{BF}_{01} \leq 1/\Sexpr{1/k1}$ if $H_0$ is true)
-first increases and then decreases again with increasing maximum sample size.
-Since $H_0$ and $H_1$ are point hypotheses, the probability of misleading
-evidence is bounded by $k = 1/10$, which is known as the ``universal bound''
-\citep{Royall1997}. However, across all choices of the number of analyses, the
-probability is much lower than the bound, remaining below 5\% across all maximum
-sample sizes and number of analysises, though bringing it below 2.5\% (the
-conventional type-I error rate for one-sided tests) requires substantial
-increases in the maximum sample size for designs with many analyses. Finally,
-increasing the number of analyses decreases the expected sample size
-(middle-bottom plot), while it has a non-monotone effect on the standard
-deviation of the sample size -- increasing for smaller maximum sample sizes and
-decreasing with larger maximum sample sizes. In sum, compared to a fixed design,
-a sequential design with even only two analyses can drastically lower the
-expected sample size and increase the probability of correct evidence, while
-only slightly increasing the probability of misleading evidence.
+The probability of misleading evidence first increases and then decreases again
+with increasing maximum sample size. Since $H_0$ and $H_1$ are point hypotheses,
+the probability of misleading evidence is bounded by $k = 1/10$, which is known
+as the ``universal bound'' \citep{Royall1997}. However, across all choices of
+the number of analyses, the probability is much lower than the bound, remaining
+below 5\% across all maximum sample sizes and number of analysises, though
+bringing it below 2.5\% (the conventional type-I error rate for one-sided tests)
+requires substantial increases in the maximum sample size for designs with many
+analyses (not shown).
+
+Increasing the number of analyses reduces the expected sample size (third-row
+plots) due to the potential early stopping, while having a non-monotone effect
+on the standard deviation of the sample size (fourth-row plots) -- increasing
+for smaller maximum sample sizes and decreasing for larger maximum sample sizes.
+Dividing the standard deviation by the expected sample size gives the
+coefficient of variation (bottom-row plots), enabling sample size variability to
+be compared while accounting for differing expected sample sizes. For a given
+maximum sample size, the coefficient of variation increases with increasing
+number of analyses, as more sample sizes at which stopping is possible become
+available. At the same time, for a given number of analyses, increasing the
+maximum sample size initially increases the coefficient of variation until it
+reaches a maximum, after which it decreases again. However, for a low number of
+analyses (e.g., two or three) this change is relatively small so that the
+coefficient of variation remains almost constant.
+
+In sum, compared to a fixed design, a sequential design with even only two or
+three analyses can drastically improve efficiency. It reduces the expected
+sample size and increase the probability of correct evidence, while only
+slightly increasing the probability of misleading evidence and the variability
+of the sample size.
 
 
 
@@ -1339,15 +1341,15 @@ In animal research, just as in clinical trials, every additional observation
 carries significant ethical weight. Reducing sample size is hence of paramount
 interest, which is one pillar of the 3R (``Replace, Reduce, Refine'') principles
 in animal research \citep{RussellBurch1959}. We will now reanalyze data from a
-preclinical experiment with rats, which was retrospectively reported and
-analyzed by \citet{Kang2025}. In the experiment, rats were randomly assigned to
-different dose levels of a candidate drug or to a control group to estimate the
-drug's effect on weight loss. Information that could be used to identify the
-drugs or studies has been removed by \citet{Kang2025} due to confidentiality
-issues. The top plot of Figure~\ref{fig:ratdata} shows the measured weight loss
-values across groups. As can be seen, the low dose group (yellow) differs little
-from the control group (black), whereas the medium (blue) and high dose (blue)
-groups show substantially higher weight loss.
+preclinical experiment with rats, which was retrospectively analyzed by
+\citet{Kang2025}. In the experiment, rats were randomly assigned to different
+dose levels of a candidate drug or to a control group to estimate the drug's
+effect on weight loss. Information that could be used to identify the drugs or
+studies has been removed by \citet{Kang2025} due to confidentiality issues. The
+top plot of Figure~\ref{fig:ratdata} shows the measured weight loss values
+across groups. As can be seen, the low dose group (yellow) differs little from
+the control group (black), whereas the medium (blue) and high dose (blue) groups
+show substantially higher weight loss.
 
 \begin{figure}[!htb]
 << "preclinical-data", fig.height = 5 >>=
@@ -1498,24 +1500,24 @@ contrasting the point hypotheses $H_0 \colon \theta_i = 0$ to $H_1 \colon
 \theta_i = 5$ is shown in the bottom plot of Figure~\ref{fig:ratdata} for each
 treatment group (color). An observation from each group is added at each step
 until the maximum group size is reached. In each step the mean difference
-$\hat{\theta}_i = \widehat{\mathrm{E}}(y_{i}) -
-\widehat{\mathrm{E}}(y_{\text{control}})$ and its standard error $\sigma_i =
-\sqrt{\widehat{\mathrm{Var}}(y_{i})/n_i +
-  \widehat{\mathrm{Var}}(y_{\text{control}})/n_{\text{control}}}$ are estimated
-from the data and used to obtain the Bayes factor. Note that the order in which
-the data were collected is unknown, which is why a random permutation is shown
-here. Appendix~\ref{app:rats} shows that also for other permutations of the
-data, similar results are obtained. As the sample size increases, the Bayes
-factor in the low dose group (yellow) increases and reaches $\mathrm{BF}_{01} >
-10$ after 10 rats, suggesting strong evidence for the absence of an effect over
-its presence. In contrast, the Bayes factors in the medium (blue) and high
-(green) dose groups decrease with increasing sample size, surpassing the
-threshold for strong evidence of $\mathrm{BF}_{01} < 1/10$ after 12 and 8 rats,
-respectively. Thus, if the experiment had been conducted using this sequential
-Bayes factor design, $8 - \max(10, 12, 8)/2 = \Sexpr{ratssaved$controlsaved}$
-rats from the control group and $6 + 12 + 6 - (10 + 12 + 8)/2
-=\Sexpr{ratssaved$treatsaved}$ rats from the treatment groups could have been
-saved, totalling to \Sexpr{ratssaved$totalsaved} saved rats.
+$\hat{\theta}_i = \widehat{\mathrm{E}}(Y_{i}) -
+\widehat{\mathrm{E}}(Y_{\text{control}})$ and its standard error $\sigma_i =
+\sqrt{\widehat{\mathrm{Var}}(Y_{i})/n_i +
+  \widehat{\mathrm{Var}}(Y_{\text{control}})/n_{\text{control}}}$ are estimated
+from the available data, which are then used to compute the Bayes factor. Note
+that the order in which the data were collected is unknown, which is why a
+random permutation is shown here. Appendix~\ref{app:rats} demonstrates that also
+for other permutations of the data, similar results are obtained. As the sample
+size increases, the Bayes factor in the low dose group (yellow) increases and
+reaches $\mathrm{BF}_{01} > 10$ after 10 rats, suggesting strong evidence for
+the absence of an effect over its presence. In contrast, the Bayes factors in
+the medium (blue) and high (green) dose groups decrease with increasing sample
+size, surpassing the threshold for strong evidence of $\mathrm{BF}_{01} < 1/10$
+after 12 and 8 rats, respectively. Thus, if the experiment had been conducted
+using this sequential Bayes factor design, $8 - \max(10, 12, 8)/2 =
+\Sexpr{ratssaved$controlsaved}$ rats from the control group and $6 + 12 + 6 -
+(10 + 12 + 8)/2 =\Sexpr{ratssaved$treatsaved}$ rats from the treatment groups
+could have been saved, totalling to \Sexpr{ratssaved$totalsaved} saved rats.
 
 
 
