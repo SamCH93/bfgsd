@@ -11,14 +11,14 @@ To cite our work, use the following BibTeX reference
   year = {2025},
   author = {Samuel Pawel and Leonhard Held},
   title = {Bayes Factor Group Sequential Designs},
-  url = {Bayes Factor Group Sequential Designs}
+  url = {https://github.com/SamCH93/bfgsd}
 }
 ```
 
 ## Reproducing the results with Docker
 
 Make sure to have Docker and Make installed, then run `make docker-rstudio` from
-the root directory of this git repository. This will install all necessary
+the root directory of this repository. This will install all necessary
 dependencies. RStudio Server can then be opened from a browser
 (http://localhost:8787), and the R scripts in `/paper`, for example,
 `/paper/BFGSD.R`, which contains all code for the results from the paper), can

@@ -819,7 +819,7 @@ In order to compute the probability for the \textit{z}-statistics to fall within
 a given region, we need to know their distribution. Suppose that $m$ analyses
 produce the sequence of \textit{z}-statistics $\{Z_1, \dots, Z_m\}$. Under
 typical conditions, these have a \emph{canonical distribution}
-\citep{Jennison1999}, that is, is a distribution of the form
+\citep[Chapter~3]{Jennison1999}, that is, is a distribution of the form
 \begin{enumerate}
   \item $\boldsymbol{Z} = (Z_1, \dots, Z_m)^\top$ has a $m$-variate normal distribution
   \item $\mathrm{E}(\boldsymbol{Z}) = \theta \boldsymbol{I}$ where $\theta$ is
@@ -974,7 +974,7 @@ zcritEff <- c(3.7307, 2.5262, 1.9917)
 
 The Low-PV trial \citep{Barbui2021} assessed if the drug ropeginterferon alfa-2b
 could help low-risk polycythaemia vera (Low-PV) patients keeping haematocrit
-levels (the volume percentage of red blood cells in blood) withing a safe range.
+levels (the volume percentage of red blood cells in blood) within a safe range.
 The study was designed to have three analyses after 50, 100, and 150 patients
 had been followed-up, respectively. The design assumed response rates of $\pi_0
 = \Sexpr{round(100*p0H1, 1)}\%$ and $\pi_1 = \Sexpr{round(100*p1H1, 1)}\%$ under
@@ -986,13 +986,14 @@ crossed. Table~\ref{tab:lowpv} summarizes the by-analysis results.
 \begin{table}[!htb]
   \centering
   \caption{Results from the Low-PV trial \citep{Barbui2021}. Shown are
-    by-analysis sample sizes ($n$) and estimated response probabilities ($\pi$)
-    in control (subscript 0) and treatment groups (subscript 1), respectively,
-    along with estimated odds ratio (OR) with corresponding 95\% confidence
-    interval (CI), \textit{z}-value, and decision based on group sequential
-    stopping bounds. The right-most column gives the Bayes factor contrasting
-    $H_0 \colon \mathrm{OR} = 1$ to $H_1 \colon \mathrm{OR} = \Sexpr{exp(pm)}$
-    based on an approximately normal likelihood of the estimated log OR.}
+    by-analysis sample sizes ($n$) and estimated response probabilities
+    ($\hat{\pi}$) in control (subscript 0) and treatment groups (subscript 1),
+    respectively, along with estimated odds ratio ($\widehat{\text{OR}}$) with
+    corresponding 95\% confidence interval (CI), \textit{z}-value, and decision
+    based on group sequential stopping bounds. The right-most column gives the
+    Bayes factor contrasting $H_0 \colon \mathrm{OR} = 1$ to $H_1 \colon
+    \mathrm{OR} = \Sexpr{exp(pm)}$ based on an approximately normal likelihood
+    of the estimated log OR.}
   \label{tab:lowpv}
 %% \rowcolors{1}{}{gray!15}
 << "Low-PV-trial-table", results = "asis" >>=
@@ -1478,7 +1479,7 @@ ratssaved <- do.call("rbind", lapply(X = kanglist, FUN = function(x) x$decision)
               controlsaved = min(ncontrolsaved),
               totalsaved = sum(ntreatsaved) + min(ncontrolsaved))
 @
-\caption{Weight loss in rats assigned to different levels of candidate drug
+\caption{Weight loss in rats assigned to different levels of a candidate drug
   \citep{Kang2025} (top plot). The bottom plot shows a sequential Bayes factor
   analysis contrasting the null hypothesis of no mean difference ($H_0 \colon
   \theta_i = 0$) to a mean difference of 5 grams ($H_0 \colon \theta_i =
@@ -1655,9 +1656,8 @@ distribution with non-centrality parameter $\lambda$. When the hyperparameters
 are set to $\kappa = 1$, $\mu = 0$, $a = -\infty$, $b=+\infty$, the prior
 becomes a Cauchy distribution, and the Bayes factor reduces to the widely used
 ``Jeffreys-Zellner-Siow'' (JZS) Bayes factor \citep{Jeffreys:1961, Zellner1980}.
-The JZS Bayes factor is typically used with a default scale of $\tau =
-1/\sqrt{2}$, as e.g., implemented in the \texttt{BayesFactor} R package
-\citep{Rouder2009}.
+The JZS Bayes factor is typically used with a scale of $\tau = 1/\sqrt{2}$, as
+e.g., implemented in the \texttt{BayesFactor} R package \citep{Rouder2009}.
 
 Design calculations for the sequential Bayes factor \textit{t}-test can also be
 embedded in the proposed \textit{z}-statistic framework. The Bayes
@@ -1741,7 +1741,7 @@ factor to sequential experiments in psychology. They consider an extreme design
 involving \Sexpr{length(n)} analyses, in which an analysis is performed after
 every additional pair of participants in treatment and control groups until the
 maximum sample size $n_{\Sexpr{length(n)}} = \Sexpr{nmax}$ is reached or the
-experiment stopped before. They set the asymmetric Bayes factor thresholds $k_0
+experiment stopped before. They set asymmetric Bayes factor thresholds $k_0
 = \Sexpr{k0}$ and $k_1 = 1/\Sexpr{1/k1}$ and specify a normal design prior for
 the standardized mean difference $\theta \sim \mathrm{N}(\Sexpr{dpm},
 \Sexpr{dpsd}^2)$ to account for parameter uncertainty. Finally, for the analysis
