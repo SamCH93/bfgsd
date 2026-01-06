@@ -2,13 +2,13 @@
 
 This repository contains code and data to reproduce result from the manuscript
 
-> Pawel, S., Held. L. (2025). Bayes Factor Group Sequential Designs. <https://github.com/SamCH93/bfgsd>
+> Pawel, S., Held. L. (2026). Bayes Factor Group Sequential Designs. <https://github.com/SamCH93/bfgsd>
 
 To cite our work, use the following BibTeX reference
 
 ```BibTeX
-@article{PawelHeld2025,
-  year = {2025},
+@article{PawelHeld2026,
+  year = {2026},
   author = {Samuel Pawel and Leonhard Held},
   title = {Bayes Factor Group Sequential Designs},
   url = {https://github.com/SamCH93/bfgsd}

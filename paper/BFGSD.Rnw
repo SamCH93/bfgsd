@@ -1870,9 +1870,9 @@ Data from the Low-PV trial were extracted from Table S5 in the supplement of
 Figure~ 4 in \citet{Kang2025}. Code and data to reproduce our analyses are
 openly available at \url{https://github.com/SamCH93/bfgsd}. A snapshot of the
 repository at the time of writing is available at
-\url{https://doi.org/10.5281/zenodo.XXXXXX}. We used the statistical programming
-language \Sexpr{R.Version()[["version.string"]]} for analyses \citep{R} along
-with the \texttt{ggplot2} \citep{Wickham2016}, \texttt{dplyr}
+\url{https://doi.org/10.5281/zenodo.18160652}. We used the statistical
+programming language \Sexpr{R.Version()[["version.string"]]} for analyses
+\citep{R} along with the \texttt{ggplot2} \citep{Wickham2016}, \texttt{dplyr}
 \citep{Wickham2023}, \texttt{mvtnorm} \citep{Genz2009}, \texttt{ggpubr}
 \citep{Kassambara2023}, \texttt{ggrain} \citep{Allen2021}, \texttt{xtable}
 \citep{Dahl2019}, \texttt{rpact} \citep{WassmerBrannath:2016}, and
