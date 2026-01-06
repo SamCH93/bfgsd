@@ -43,7 +43,7 @@
   Center for Reproducible Science and Research Synthesis (CRS) \\
   University of Zurich \\
   \texttt{\{samuel.pawel,leonhard.held\}@uzh.ch} \\ ~ \\
-  December 19, 2025
+  January 6, 2026
 }
 
 %% hyperref options
